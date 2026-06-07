@@ -1,0 +1,26 @@
+{
+  "name": "autopeer-frontend",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxt typecheck"
+  },
+  "dependencies": {
+    "@nuxtjs/color-mode": "^4.0.0",
+    "@nuxtjs/i18n": "^10.4.0",
+    "@simplewebauthn/browser": "^13.3.0",
+    "nuxt": "^4.4.7",
+    "vue": "^3.5.35",
+    "vue-router": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.2",
+    "typescript": "^6.0.3",
+    "vue-tsc": "^3.3.3"
+  }
+}

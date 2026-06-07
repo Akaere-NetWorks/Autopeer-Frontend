@@ -1,0 +1,7 @@
+/** Route guard: require an authenticated user (or admin). */
+export default defineNuxtRouteMiddleware((to) => {
+  const { isAuthenticated } = useAuth()
+  if (!isAuthenticated.value) {
+    return navigateTo({ path: '/login', query: { redirect: to.fullPath } })
+  }
+})

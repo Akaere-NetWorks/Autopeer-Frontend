@@ -1,0 +1,15 @@
+# Netlify build config for the AutoPeer Nuxt 4 frontend.
+# The Nitro `netlify` preset produces a serverless function + static assets in `dist`.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  # Force the Nitro Netlify preset.
+  NITRO_PRESET = "netlify"
+  # Set the backend base URL and other secrets in the Netlify UI (Site settings →
+  # Environment variables), NOT here. At minimum set API_BASE.
+  NODE_VERSION = "22"
+
+# SPA-style fallback is handled by the Nitro function; no manual redirects needed.

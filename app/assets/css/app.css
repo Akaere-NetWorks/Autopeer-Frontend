@@ -1,0 +1,132 @@
+/* App-level helpers, responsive grids, overlays — AutoPeer MD3 frontend. */
+
+/* full-width button helper */
+.full-btn { width: 100%; }
+
+/* responsive grids (from the design prototype) */
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.metric-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.charts-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+.params-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.peers-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.why-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+@media (max-width: 1080px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 720px) {
+  .stats-grid, .metric-3, .charts-2, .params-2, .peers-grid, .why-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* page shell */
+.page-shell { display: flex; min-height: 100vh; background: var(--md-sys-color-background); }
+.page-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.page-content { max-width: 1120px; margin: 0 auto; width: 100%; padding: 24px clamp(16px, 4vw, 40px) 64px; }
+.page-footer {
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+  padding: 20px clamp(16px, 4vw, 40px);
+  display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* spinner */
+.spin {
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 4px solid var(--md-sys-color-secondary-container);
+  border-top-color: var(--md-sys-color-primary);
+  animation: bootspin 1s linear infinite;
+}
+.spin-sm { width: 20px; height: 20px; border-width: 3px; }
+@keyframes bootspin { to { transform: rotate(360deg); } }
+
+/* spinning icon (e.g. running state) */
+.msym.spinning { animation: bootspin 1s linear infinite; }
+
+/* dropdown menu (theme / locale / overflow) */
+.menu-anchor { position: relative; }
+.menu {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 60;
+  min-width: 200px; padding: 8px;
+  background: var(--md-sys-color-surface-container-high);
+  border-radius: var(--md-shape-md);
+  box-shadow: var(--md-elev-3);
+}
+.menu-item {
+  --slc: var(--md-sys-color-on-surface);
+  position: relative; display: flex; align-items: center; gap: 12px;
+  height: 48px; padding: 0 12px; border-radius: var(--md-shape-sm);
+  cursor: pointer; overflow: hidden; isolation: isolate;
+  color: var(--md-sys-color-on-surface);
+  font: 500 14px/20px var(--md-font); letter-spacing: .1px;
+  border: none; background: transparent; width: 100%; text-align: left;
+}
+.menu-item > * { position: relative; z-index: 1; }
+.menu-item .msym { font-size: 20px; color: var(--md-sys-color-on-surface-variant); }
+.menu-item-active { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+.menu-item-active .msym { color: inherit; }
+
+/* swatch for seed color picker */
+.swatch { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--md-sys-color-outline-variant); flex-shrink: 0; }
+.swatch-active { border-color: var(--md-sys-color-on-surface); }
+
+/* scrim */
+.scrim { position: fixed; inset: 0; background: rgb(var(--md-sys-color-scrim-rgb) / .4); z-index: 50; }
+
+/* dialog */
+.dialog {
+  position: fixed; z-index: 70; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 64px); overflow-y: auto;
+  background: var(--md-sys-color-surface-container-high);
+  border-radius: var(--md-shape-xl); padding: 24px;
+  box-shadow: var(--md-elev-5);
+}
+.dialog-title { margin: 0 0 12px; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
+
+/* snackbar / toast */
+.snackbar-host {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+  z-index: 100; display: flex; flex-direction: column; gap: 8px; align-items: center;
+  width: max-content; max-width: calc(100vw - 32px);
+}
+.snackbar {
+  display: flex; align-items: center; gap: 12px;
+  min-height: 48px; padding: 0 16px; border-radius: var(--md-shape-xs);
+  background: var(--md-sys-color-inverse-surface); color: var(--md-sys-color-inverse-on-surface);
+  box-shadow: var(--md-elev-3);
+  font: 400 14px/20px var(--md-font); letter-spacing: .25px;
+}
+.snackbar-error { background: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); }
+.snackbar .snackbar-action { color: var(--md-sys-color-inverse-primary); background: none; border: none; cursor: pointer; font: 500 14px/20px var(--md-font); padding: 4px 8px; }
+.snackbar-enter-active, .snackbar-leave-active { transition: opacity var(--md-dur-short) var(--md-ease-standard), transform var(--md-dur-short) var(--md-ease-emphasized); }
+.snackbar-enter-from, .snackbar-leave-to { opacity: 0; transform: translateY(12px); }
+
+/* skeleton shimmer */
+.skeleton {
+  background: linear-gradient(90deg,
+    var(--md-sys-color-surface-container) 25%,
+    var(--md-sys-color-surface-container-high) 50%,
+    var(--md-sys-color-surface-container) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease infinite;
+  border-radius: var(--md-shape-sm);
+}
+@keyframes skeleton-shimmer { to { background-position: -200% 0; } }
+
+/* page transition (route) */
+.page-enter-active { transition: opacity var(--md-dur-medium) var(--md-ease-emphasized-decel), transform var(--md-dur-medium) var(--md-ease-emphasized-decel); }
+.page-enter-from { opacity: 0; transform: translateY(8px); }
+.page-leave-active { transition: opacity var(--md-dur-short) var(--md-ease-standard); }
+.page-leave-to { opacity: 0; }
+
+/* generic helpers */
+.row { display: flex; align-items: center; }
+.col { display: flex; flex-direction: column; }
+.gap-2 { gap: 8px; } .gap-3 { gap: 12px; } .gap-4 { gap: 16px; } .gap-5 { gap: 20px; } .gap-6 { gap: 24px; }
+.txt-variant { color: var(--md-sys-color-on-surface-variant); }
+.text-center { text-align: center; }
+.flex-wrap { flex-wrap: wrap; }
+.space-between { justify-content: space-between; }
+.ml-auto { margin-left: auto; }
