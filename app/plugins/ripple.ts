@@ -16,6 +16,11 @@ function spawnRipple(el: HTMLElement, e: PointerEvent) {
   const y = (e.clientY || rect.top + rect.height / 2) - rect.top - size / 2
   const span = document.createElement('span')
   span.className = 'ripple'
+  // position/z-index inline so they outrank the `.btn > *`, `.segmented .seg > *`,
+  // etc. rules that would otherwise turn this appended child into an in-flow flex
+  // item and shift the label. Inline styles beat any selector regardless of order.
+  span.style.position = 'absolute'
+  span.style.zIndex = '0'
   span.style.width = span.style.height = `${size}px`
   span.style.left = `${x}px`
   span.style.top = `${y}px`

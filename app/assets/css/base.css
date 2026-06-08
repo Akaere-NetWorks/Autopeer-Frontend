@@ -131,6 +131,10 @@ button { font-family: inherit; }
 .state-layer[aria-disabled="true"]::before,
 .state-layer:disabled::before { opacity: 0; }
 
+/* NB: position/z-index are ALSO set inline by the v-ripple directive so they
+   beat the `.btn > *` / `.segmented .seg > *` … overlays-vs-content rules in
+   components.css. Without that the span would become an in-flow flex item and
+   shove the label sideways on click. The declarations here are the fallback. */
 .ripple {
   position: absolute;
   border-radius: 50%;
