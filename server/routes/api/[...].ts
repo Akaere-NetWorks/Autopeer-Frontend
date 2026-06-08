@@ -27,7 +27,21 @@ const SKIP_RES_HEADERS = new Set([
 
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event)
-  const base = (config.apiBase as string).replace(/\/+$/, '')
+  // Resolve the backend base at RUNTIME. `runtimeConfig.apiBase` is frozen at
+  // BUILD time; Nuxt only re-applies the `NUXT_`-prefixed override at runtime —
+  // so a plain `API_BASE` set on the host (Netlify env, Docker, shell) would be
+  // ignored. Read process.env directly (available on Node/Netlify-function/Vercel
+  // presets) so the documented `API_BASE` works at runtime, falling back to
+  // NUXT_API_BASE and then the build-time runtimeConfig value.
+  const base = (process.env.API_BASE || process.env.NUXT_API_BASE || (config.apiBase as string) || '').replace(/\/+$/, '')
+  if (!base) {
+    setResponseStatus(event, 500)
+    setResponseHeader(event, 'content-type', 'application/json')
+    return JSON.stringify({
+      error: 'misconfigured',
+      message: 'API_BASE is not set. Configure the autopeer-center base URL on the frontend host.',
+    })
+  }
   const target = base + event.path // event.path includes the /api/v1/... path + query string
 
   const incoming = getRequestHeaders(event)
@@ -58,6 +72,10 @@ export default defineEventHandler(async (event) => {
   try {
     upstream = await fetch(target, { method, headers, body: body as RequestInit['body'], redirect: 'manual' })
   } catch (err) {
+    // Log the real cause server-side (DNS, TLS, connection refused, …) — the
+    // opaque client message stays generic, but operators get a diagnosable line.
+    const e = err as { message?: string, cause?: { code?: string, message?: string } }
+    console.error(`[api-proxy] upstream fetch failed: ${method} ${target} — ${e?.cause?.code || e?.cause?.message || e?.message || err}`)
     setResponseStatus(event, 502)
     setResponseHeader(event, 'content-type', 'application/json')
     return JSON.stringify({
