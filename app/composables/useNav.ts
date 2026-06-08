@@ -11,7 +11,7 @@ export interface NavGroup {
 /** Navigation model — guest vs authenticated. Atlas is intentionally absent
  *  (the OSS backend ships without the Atlas subsystem). */
 export function useNav() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, isAdmin } = useAuth()
 
   const groups = computed<NavGroup[]>(() => {
     if (!isAuthenticated.value) {
@@ -25,7 +25,7 @@ export function useNav() {
         },
       ]
     }
-    return [
+    const base: NavGroup[] = [
       {
         label: 'nav.sections.peering',
         items: [
@@ -41,6 +41,32 @@ export function useNav() {
           { icon: 'notifications', label: 'nav.notifications', to: '/account/notifications' },
           { icon: 'receipt_long', label: 'nav.auditLog', to: '/account/audit' },
           { icon: 'vpn_key', label: 'nav.mcpKeys', to: '/account/mcp-keys' },
+          { icon: 'smart_toy', label: 'nav.assistant', to: '/account/assistant' },
+        ],
+      },
+    ]
+    if (!isAdmin.value) return base
+    return [
+      ...base,
+      {
+        label: 'nav.sections.admin',
+        items: [
+          { icon: 'dashboard', label: 'nav.admin.overview', to: '/admin' },
+          { icon: 'swap_horiz', label: 'nav.admin.peers', to: '/admin/peers' },
+          { icon: 'dns', label: 'nav.admin.nodes', to: '/admin/nodes' },
+          { icon: 'deployed_code', label: 'nav.admin.releases', to: '/admin/releases' },
+          { icon: 'receipt_long', label: 'nav.admin.audit', to: '/admin/audit' },
+        ],
+      },
+      {
+        label: 'nav.sections.adminSystem',
+        items: [
+          { icon: 'smart_toy', label: 'nav.admin.bot', to: '/admin/bot' },
+          { icon: 'tune', label: 'nav.admin.settings', to: '/admin/settings' },
+          { icon: 'devices', label: 'nav.admin.devices', to: '/admin/devices' },
+          { icon: 'key', label: 'nav.admin.mcpKeys', to: '/admin/mcp-keys' },
+          { icon: 'monitor_heart', label: 'nav.admin.system', to: '/admin/system' },
+          { icon: 'lists', label: 'nav.admin.queue', to: '/admin/queue' },
         ],
       },
     ]
@@ -51,7 +77,7 @@ export function useNav() {
     if (to === '/peers') {
       return route.path === '/peers' || (route.path.startsWith('/peers/') && route.path !== '/peers/new')
     }
-    if (to === '/') return route.path === '/'
+    if (to === '/' || to === '/admin') return route.path === to
     return route.path === to || route.path.startsWith(`${to}/`)
   }
 

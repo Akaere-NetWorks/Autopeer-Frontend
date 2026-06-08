@@ -30,9 +30,10 @@ const year = new Date().getFullYear()
     </aside>
 
     <!-- Modal drawer (mobile) -->
-    <Teleport to="body">
-      <Transition name="snackbar">
-        <div v-if="drawerOpen">
+    <ClientOnly>
+      <Teleport to="body">
+        <Transition name="snackbar">
+          <div v-if="drawerOpen">
           <div class="scrim" @click="drawerOpen = false" />
           <aside
             class="nav-drawer"
@@ -40,9 +41,10 @@ const year = new Date().getFullYear()
           >
             <AppSidebar @navigate="drawerOpen = false" />
           </aside>
-        </div>
-      </Transition>
-    </Teleport>
+          </div>
+        </Transition>
+      </Teleport>
+    </ClientOnly>
 
     <div class="page-main">
       <AppTopBar :title="title" :scrolled="scrolled" @open-drawer="drawerOpen = true" />

@@ -288,7 +288,7 @@
   transition: background-color var(--md-dur-short), box-shadow var(--md-dur-short);
 }
 .top-app-bar.scrolled { background: var(--md-sys-color-surface-container); box-shadow: var(--md-elev-2); }
-.top-app-bar .bar-title { font: 400 22px/28px var(--md-font); }
+.top-app-bar .bar-title { font: 400 22px/28px var(--md-font); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------------- List items ---------------- */
 .list-item {

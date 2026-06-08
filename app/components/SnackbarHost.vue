@@ -14,8 +14,9 @@ async function copyId(id: string | undefined) {
 </script>
 
 <template>
-  <Teleport to="body">
-    <div class="snackbar-host">
+  <ClientOnly>
+    <Teleport to="body">
+      <div class="snackbar-host">
       <TransitionGroup name="snackbar">
         <div
           v-for="toast in toasts"
@@ -40,5 +41,6 @@ async function copyId(id: string | undefined) {
         </div>
       </TransitionGroup>
     </div>
-  </Teleport>
+    </Teleport>
+  </ClientOnly>
 </template>
