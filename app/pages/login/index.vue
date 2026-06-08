@@ -6,7 +6,7 @@ const route = useRoute()
 const toast = useToast()
 const auth = useAuth()
 
-type Step = 'asn' | 'email' | 'gpg'
+type Step = 'asn' | 'email' | 'gpg' | 'admin'
 type Method = 'email' | 'gpg' | 'passkey'
 
 const step = ref<Step>('asn')
@@ -14,6 +14,8 @@ const asn = ref('')
 const method = ref<Method>('email')
 const code = ref('')
 const signed = ref('')
+const adminEmail = ref('')
+const adminPassword = ref('')
 const challengeId = ref('')
 const challengeText = ref('')
 const maskedEmail = ref('')
@@ -24,7 +26,10 @@ const captchaRef = ref<{ reset: () => void } | null>(null)
 
 const { data: tsConfig } = await useAsyncData('turnstile', () => auth.turnstileConfig().catch(() => ({ enabled: false, site_key: '' })))
 
-const passkeySupported = computed(() => import.meta.client && typeof window.PublicKeyCredential !== 'undefined')
+// Detect passkey support only AFTER mount so SSR and the first client render
+// agree (both false) — otherwise the method segmented control hydration-mismatches.
+const passkeySupported = ref(false)
+onMounted(() => { passkeySupported.value = typeof window.PublicKeyCredential !== 'undefined' })
 
 const methodOptions = computed(() => {
   const opts = [
@@ -38,6 +43,7 @@ const methodOptions = computed(() => {
 const subtitle = computed(() => {
   if (step.value === 'email') return t('login.subtitleEmail', { asn: asn.value || '…' })
   if (step.value === 'gpg') return t('login.subtitleGpg', { asn: asn.value || '…' })
+  if (step.value === 'admin') return t('login.subtitleAdmin')
   if (method.value === 'passkey') return t('login.subtitlePasskey', { asn: asn.value || '…' })
   return t('login.subtitleAsn')
 })
@@ -67,9 +73,26 @@ function resetCaptcha() {
   captchaRef.value?.reset()
 }
 
-function redirectAfterLogin() {
-  const r = typeof route.query.redirect === 'string' ? route.query.redirect : '/peers'
+function redirectAfterLogin(fallback = '/peers') {
+  const r = typeof route.query.redirect === 'string' ? route.query.redirect : fallback
   return navigateTo(r)
+}
+
+async function startAdmin() {
+  if (tsConfig.value?.enabled && !turnstileToken.value) {
+    toast.show(t('captcha.required'), { kind: 'error' })
+    return
+  }
+  submitting.value = true
+  try {
+    await auth.adminLogin(adminEmail.value, adminPassword.value, turnstileToken.value || undefined)
+    await redirectAfterLogin('/admin')
+  } catch (e) {
+    toast.error(e)
+    resetCaptcha()
+  } finally {
+    submitting.value = false
+  }
 }
 
 async function startAuth() {
@@ -191,6 +214,8 @@ async function copyChallenge() {
           >
             {{ method === 'email' ? t('login.sendCode') : method === 'passkey' ? t('login.usePasskey') : t('login.continueGpg') }}
           </MdButton>
+
+          <MdButton variant="text" icon="admin_panel_settings" :style="{ margin: '0 auto' }" @click="step = 'admin'">{{ t('login.adminLink') }}</MdButton>
         </div>
 
         <!-- Email code step -->
@@ -216,7 +241,7 @@ async function copyChallenge() {
         </div>
 
         <!-- GPG step -->
-        <div v-else class="col gap-4">
+        <div v-else-if="step === 'gpg'" class="col gap-4">
           <div>
             <p class="md-label-large txt-variant" :style="{ margin: '0 0 6px' }">{{ t('login.challengeText') }}</p>
             <div class="code-block" :style="{ position: 'relative' }">
@@ -241,6 +266,47 @@ async function copyChallenge() {
             {{ t('login.verifySignature') }}
           </MdButton>
           <MdButton variant="text" icon="arrow_back" :style="{ margin: '0 auto' }" @click="step = 'asn'">{{ t('login.backToLogin') }}</MdButton>
+        </div>
+
+        <!-- Admin step -->
+        <div v-else-if="step === 'admin'" class="col gap-5">
+          <MdTextField
+            :label="t('login.adminEmail')"
+            icon="mail"
+            type="email"
+            inputmode="email"
+            :model-value="adminEmail"
+            tf-bg="var(--md-sys-color-surface-container-low)"
+            @update:model-value="(v: string) => (adminEmail = v)"
+          />
+          <MdTextField
+            :label="t('login.adminPassword')"
+            icon="lock"
+            type="password"
+            :model-value="adminPassword"
+            tf-bg="var(--md-sys-color-surface-container-low)"
+            @update:model-value="(v: string) => (adminPassword = v)"
+          />
+          <ClientOnly>
+            <TurnstileWidget
+              v-if="tsConfig?.enabled && tsConfig.site_key"
+              ref="captchaRef"
+              :site-key="tsConfig.site_key"
+              @verified="(tok: string) => (turnstileToken = tok)"
+              @expired="turnstileToken = ''"
+            />
+          </ClientOnly>
+          <MdButton
+            variant="filled"
+            icon="login"
+            :disabled="!adminEmail || !adminPassword || !captchaReady"
+            :loading="submitting"
+            block
+            @click="startAdmin"
+          >
+            {{ t('login.adminSignIn') }}
+          </MdButton>
+          <MdButton variant="text" icon="arrow_back" :style="{ margin: '0 auto' }" @click="step = 'asn'">{{ t('login.backToUser') }}</MdButton>
         </div>
       </div>
     </div>

@@ -181,7 +181,12 @@
     "passkeyUnsupported": "此瀏覽器不支援通行金鑰。",
     "backToLogin": "返回登入",
     "loginDisabled": "使用者登入目前已停用。",
-    "welcome": "已以 AS{asn} 身分登入"
+    "welcome": "已以 AS{asn} 身分登入",
+    "adminEmail": "電子郵件",
+    "adminPassword": "密碼",
+    "adminSignIn": "登入管理面板",
+    "subtitleAdmin": "使用管理員憑證登入。",
+    "backToUser": "返回使用者登入"
   },
   "cliActivate": {
     "title": "授權裝置",

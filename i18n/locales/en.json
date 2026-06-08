@@ -181,7 +181,12 @@
     "passkeyUnsupported": "This browser does not support passkeys.",
     "backToLogin": "Back to login",
     "loginDisabled": "User login is currently disabled.",
-    "welcome": "Signed in as AS{asn}"
+    "welcome": "Signed in as AS{asn}",
+    "adminEmail": "Email",
+    "adminPassword": "Password",
+    "adminSignIn": "Sign in to admin",
+    "subtitleAdmin": "Sign in with your administrator credentials.",
+    "backToUser": "Back to user sign-in"
   },
   "cliActivate": {
     "title": "Authorize device",

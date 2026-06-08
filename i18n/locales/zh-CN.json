@@ -181,7 +181,12 @@
     "passkeyUnsupported": "此浏览器不支持通行密钥。",
     "backToLogin": "返回登录",
     "loginDisabled": "用户登录当前已禁用。",
-    "welcome": "已登录为 AS{asn}"
+    "welcome": "已登录为 AS{asn}",
+    "adminEmail": "邮箱",
+    "adminPassword": "密码",
+    "adminSignIn": "登录管理面板",
+    "subtitleAdmin": "使用管理员凭据登录。",
+    "backToUser": "返回用户登录"
   },
   "cliActivate": {
     "title": "授权设备",
