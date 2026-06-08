@@ -5,50 +5,98 @@ definePageMeta({ middleware: 'auth', title: 'nav.auditLog' })
 
 const { t } = useI18n()
 const api = useApi()
-const toast = useToast()
-const { relTime } = useFormat()
+const { relTime, fmtDate } = useFormat()
 
 const PER_PAGE = 25
 const page = ref(1)
-const extra = ref<AuditLog[]>([]) // pages loaded beyond the first
-const loadingMore = ref(false)
+const actionFilter = ref('')
 
 // First page lives inside the asyncData payload so SSR and client hydration agree.
-const { data, pending } = await useAsyncData('audit', () => api.account.audit({ page: 1, per_page: PER_PAGE }), { server: false })
+// Re-fetches automatically whenever the page number or the applied action filter
+// changes; { lazy: true, server: false } keeps it client-only (SSR-safe, matches neighbours).
+const { data, pending } = await useAsyncData(
+  'audit',
+  () => api.account.audit({ action: actionFilter.value || undefined, page: page.value, per_page: PER_PAGE }),
+  { watch: [page, actionFilter], lazy: true, server: false },
+)
 
-const logs = computed<AuditLog[]>(() => [...(data.value?.logs ?? []), ...extra.value])
+const logs = computed<AuditLog[]>(() => data.value?.logs ?? [])
 const total = computed(() => data.value?.total ?? 0)
-const hasMore = computed(() => logs.value.length < total.value)
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PER_PAGE)))
 
-async function loadMore() {
-  loadingMore.value = true
-  try {
-    page.value += 1
-    const res = await api.account.audit({ page: page.value, per_page: PER_PAGE })
-    extra.value.push(...res.logs)
-  } catch (e) {
-    toast.error(e)
-    page.value -= 1
-  } finally {
-    loadingMore.value = false
-  }
+// Debounce the action filter input (and reset to page 1 on a new query) so each
+// keystroke doesn't fire a request. The backend's /user/audit takes only `action`.
+const actionInput = ref('')
+let debounce: ReturnType<typeof setTimeout> | undefined
+watch(actionInput, (v) => {
+  if (debounce) clearTimeout(debounce)
+  debounce = setTimeout(() => {
+    const next = v.trim()
+    if (next !== actionFilter.value) {
+      page.value = 1
+      actionFilter.value = next
+    }
+  }, 350)
+})
+function clearFilter() {
+  actionInput.value = ''
+  if (debounce) clearTimeout(debounce)
+  page.value = 1
+  actionFilter.value = ''
+}
+
+// Expand/collapse the raw detail JSON for a single row.
+const expandedId = ref('')
+function toggleDetails(id: string) {
+  expandedId.value = expandedId.value === id ? '' : id
+}
+function detailJSON(detail?: AuditLog['detail']) {
+  return detail && Object.keys(detail).length ? JSON.stringify(detail, null, 2) : '{}'
 }
 
 function isPeer(action: string) {
   return action.includes('peer')
 }
-function pretty(action: string) {
-  return action.replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+
+// Localized human label for known action codes (StatusTag-style), falling back to
+// a generic "audit event" string for anything unmapped.
+const ACTION_LABELS: Record<string, string> = {
+  'user.login': 'userAudit.actionLogin',
+  'user.login_gpg': 'userAudit.actionLoginGpg',
+  'admin.login_as': 'userAudit.actionAdminLoginAs',
+  'peer.create': 'userAudit.actionPeerCreate',
+  'peer.approve': 'userAudit.actionPeerApprove',
+  'peer.approve.diverged': 'userAudit.actionPeerApproveDiverged',
+  'peer.reject': 'userAudit.actionPeerReject',
+  'peer.suspend': 'userAudit.actionPeerSuspend',
+  'peer.unsuspend': 'userAudit.actionPeerUnsuspend',
+  'peer.update': 'userAudit.actionPeerUpdate',
+  'peer.user_update': 'userAudit.actionPeerUpdate',
+  'peer.email_updated': 'userAudit.actionEmailUpdate',
+  'peer.delete': 'userAudit.actionPeerDelete',
+  'peer.admin_delete': 'userAudit.actionPeerAdminDelete',
+  'peer.import_peer': 'userAudit.actionPeerImport',
 }
-function detailText(log: AuditLog) {
-  const parts: string[] = []
-  if (log.target_id) parts.push(log.target_id)
-  if (log.detail && typeof log.detail === 'object') {
-    for (const [k, v] of Object.entries(log.detail)) {
-      if (v != null && typeof v !== 'object') parts.push(`${k}=${v}`)
-    }
-  }
-  return parts.join(' · ') || log.operator
+function actionLabel(action: string) {
+  const key = ACTION_LABELS[action]
+  return key ? t(key) : t('userAudit.actionUnknown')
+}
+function actionKind(action: string): 'success' | 'warning' | 'error' | 'info' | 'neutral' {
+  if (action.includes('delete') || action.includes('reject') || action.includes('suspend')) return 'error'
+  if (action.includes('approve') || action.includes('create') || action.includes('unsuspend')) return 'success'
+  if (action.includes('login')) return 'info'
+  return 'neutral'
+}
+
+function detailValue(detail: AuditLog['detail'], key: string): string {
+  const value = detail?.[key]
+  return value === undefined || value === null || value === '' ? '' : String(value)
+}
+function actionDescription(log: AuditLog) {
+  const asn = detailValue(log.detail, 'asn')
+  if (asn) return t('userAudit.asnRelated', { asn })
+  if (log.target_id) return t('userAudit.peerRelated')
+  return t('userAudit.accountRelated')
 }
 </script>
 
@@ -56,8 +104,24 @@ function detailText(log: AuditLog) {
   <div class="col gap-5">
     <PageHeader icon="receipt_long" :title="t('audit.title')" :subtitle="t('audit.subtitle')" />
 
-    <div v-if="pending && !logs.length" class="col gap-3">
-      <SkeletonBlock v-for="i in 5" :key="i" height="56px" radius="12px" />
+    <div class="row gap-2" :style="{ maxWidth: '420px' }">
+      <MdTextField
+        :model-value="actionInput"
+        icon="search"
+        :placeholder="t('userAudit.actionPlaceholder')"
+        :style="{ flex: 1, minWidth: 0 }"
+        @update:model-value="(v: string) => (actionInput = v)"
+      />
+      <MdIconButton
+        v-if="actionInput"
+        icon="close"
+        :title="t('audit.clearFilters')"
+        @click="clearFilter"
+      />
+    </div>
+
+    <div v-if="data === null" class="col gap-3">
+      <SkeletonBlock v-for="i in 6" :key="i" height="64px" radius="12px" />
     </div>
 
     <div v-else-if="!logs.length" class="card card-outlined card-pad text-center txt-variant">{{ t('audit.empty') }}</div>
@@ -67,25 +131,59 @@ function detailText(log: AuditLog) {
         <div
           v-for="(log, i) in logs"
           :key="log.id"
-          class="list-item"
-          :style="{ borderBottom: i < logs.length - 1 ? '1px solid var(--md-sys-color-outline-variant)' : 'none', padding: '14px 20px' }"
+          :style="{ borderBottom: i < logs.length - 1 ? '1px solid var(--md-sys-color-outline-variant)' : 'none' }"
         >
-          <span :style="{
-            display: 'inline-flex', width: '40px', height: '40px', borderRadius: '12px', alignItems: 'center', justifyContent: 'center',
-            background: isPeer(log.action) ? 'var(--md-sys-color-primary-container)' : 'var(--md-sys-color-secondary-container)',
-            color: isPeer(log.action) ? 'var(--md-sys-color-on-primary-container)' : 'var(--md-sys-color-on-secondary-container)',
-          }">
-            <MdSym :name="isPeer(log.action) ? 'hub' : 'person'" :size="20" fill />
-          </span>
-          <div :style="{ flex: 1, minWidth: 0 }">
-            <div class="md-title-small">{{ pretty(log.action) }}</div>
-            <div class="md-body-small mono txt-variant">{{ detailText(log) }}</div>
+          <div class="list-item" :style="{ padding: '14px 20px' }">
+            <span :style="{
+              display: 'inline-flex', width: '40px', height: '40px', borderRadius: '12px', alignItems: 'center', justifyContent: 'center',
+              background: isPeer(log.action) ? 'var(--md-sys-color-primary-container)' : 'var(--md-sys-color-secondary-container)',
+              color: isPeer(log.action) ? 'var(--md-sys-color-on-primary-container)' : 'var(--md-sys-color-on-secondary-container)',
+            }">
+              <MdSym :name="isPeer(log.action) ? 'hub' : 'person'" :size="20" fill />
+            </span>
+            <div :style="{ flex: 1, minWidth: 0 }">
+              <div class="row gap-2" :style="{ flexWrap: 'wrap', rowGap: '4px' }">
+                <MdStatus :kind="actionKind(log.action)">{{ actionLabel(log.action) }}</MdStatus>
+                <code class="md-body-small mono txt-variant" :style="{ background: 'var(--md-sys-color-surface-container-highest)', padding: '1px 6px', borderRadius: '6px' }">{{ log.action }}</code>
+              </div>
+              <div class="md-body-small txt-variant" :style="{ marginTop: '4px' }">{{ actionDescription(log) }}</div>
+            </div>
+            <span class="md-body-small txt-variant" :style="{ whiteSpace: 'nowrap' }" :title="fmtDate(log.created_at)">{{ relTime(log.created_at) }}</span>
           </div>
-          <span class="md-body-small txt-variant" :style="{ whiteSpace: 'nowrap' }">{{ relTime(log.created_at) }}</span>
+
+          <div :style="{ padding: '0 20px 14px', marginLeft: '52px' }">
+            <div class="row gap-3" :style="{ flexWrap: 'wrap', rowGap: '4px' }">
+              <span class="md-body-small txt-variant">{{ t('audit.operator') }}: <span class="mono">{{ log.operator }}</span></span>
+              <span class="md-body-small txt-variant">{{ t('audit.target') }}: <span class="mono">{{ log.target_id || t('common.dash') }}</span></span>
+            </div>
+            <MdButton
+              variant="text"
+              :icon="expandedId === log.id ? 'expand_less' : 'expand_more'"
+              :style="{ marginTop: '4px', marginLeft: '-8px' }"
+              @click="toggleDetails(log.id)"
+            >
+              {{ expandedId === log.id ? t('audit.collapse') : t('audit.expand') }}
+            </MdButton>
+            <pre
+              v-if="expandedId === log.id"
+              class="md-body-small mono"
+              :style="{
+                margin: '8px 0 0', padding: '12px', borderRadius: '12px', overflowX: 'auto',
+                whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                background: 'var(--md-sys-color-surface-container-highest)', color: 'var(--md-sys-color-on-surface-variant)',
+              }"
+            >{{ detailJSON(log.detail) }}</pre>
+          </div>
         </div>
       </div>
-      <div v-if="hasMore" class="text-center">
-        <MdButton variant="text" icon="expand_more" :loading="loadingMore" @click="loadMore">{{ t('audit.loadMore') }}</MdButton>
+
+      <div class="row space-between" :style="{ alignItems: 'center' }">
+        <span class="md-body-small txt-variant">{{ t('audit.totalCount', { count: total }) }}</span>
+        <div class="row gap-2">
+          <MdIconButton icon="chevron_left" :disabled="page <= 1" :title="t('common.back')" @click="page--" />
+          <span class="md-label-large" :style="{ alignSelf: 'center' }">{{ page }} / {{ totalPages }}</span>
+          <MdIconButton icon="chevron_right" :disabled="page >= totalPages" :title="t('common.next')" @click="page++" />
+        </div>
       </div>
     </template>
   </div>

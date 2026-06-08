@@ -12,20 +12,40 @@ const { fmtRtt } = useFormat()
 const filter = ref<'all' | PeerStatus>('all')
 const view = useCookie<'cards' | 'table'>('ap-peer-view', { default: () => 'cards', path: '/' })
 
-const { data, pending, error } = await useAsyncData('peers', async () => {
-  const [peers, summary] = await Promise.all([
+const { data, pending, error, refresh } = await useAsyncData('peers', async () => {
+  const [peers, summary, creation] = await Promise.all([
     api.peers.list(),
     api.peers.summary().catch(() => []),
+    api.peers.creationStatus().catch(() => ({ enabled: true })),
   ])
   const byId = new Map(summary.map((s) => [s.peer_id, s]))
-  return peers.map((p) => ({ ...p, _summary: byId.get(p.id) ?? null }))
-}, { server: false })
+  return {
+    peers: peers.map((p) => ({ ...p, _summary: byId.get(p.id) ?? null })),
+    creationEnabled: creation.enabled,
+  }
+}, { lazy: true, server: false })
 
-if (error.value) toast.error(error.value)
+// Surface load failures via toast, and re-surface on every subsequent refetch
+// failure (not just the first), without ever conflating error with "empty".
+watch(error, (e) => {
+  if (e) toast.error(e)
+}, { immediate: true })
 
-const peers = computed(() => data.value ?? [])
+const peers = computed(() => data.value?.peers ?? [])
+const creationEnabled = computed(() => data.value?.creationEnabled ?? true)
 const activeCount = computed(() => peers.value.filter((p) => p.status === 'active').length)
 const filtered = computed(() => filter.value === 'all' ? peers.value : peers.value.filter((p) => p.status === filter.value))
+
+const retrying = ref(false)
+async function retry() {
+  retrying.value = true
+  try {
+    await refresh()
+  }
+  finally {
+    retrying.value = false
+  }
+}
 
 const filters: { value: 'all' | PeerStatus, label: string }[] = [
   { value: 'all', label: t('peers.filters.all') },
@@ -48,7 +68,7 @@ const viewOptions = [
         <h1 class="md-headline-medium" :style="{ margin: 0 }">{{ t('peers.title') }}</h1>
         <p class="md-body-medium txt-variant" :style="{ margin: '6px 0 0' }">{{ t('peers.summary', { total: peers.length, active: activeCount }) }}</p>
       </div>
-      <MdButton variant="filled" icon="add" @click="navigateTo('/peers/new')">{{ t('peers.newPeer') }}</MdButton>
+      <MdButton v-if="creationEnabled" variant="filled" icon="add" @click="navigateTo('/peers/new')">{{ t('peers.newPeer') }}</MdButton>
     </div>
 
     <div class="row space-between flex-wrap gap-3">
@@ -63,14 +83,29 @@ const viewOptions = [
       <SkeletonBlock v-for="i in 4" :key="i" height="120px" radius="12px" />
     </div>
 
-    <!-- Empty -->
+    <!-- Error (kept distinct from the empty state so a failed request never
+         reads as "you have zero peers") -->
+    <div
+      v-else-if="error"
+      class="card card-outlined card-pad text-center col gap-4"
+      :style="{ alignItems: 'center', padding: '56px 24px' }"
+    >
+      <span :style="{ display: 'inline-flex', width: '72px', height: '72px', borderRadius: '24px', alignItems: 'center', justifyContent: 'center', background: 'var(--md-sys-color-error-container)', color: 'var(--md-sys-color-on-error-container)' }">
+        <MdSym name="cloud_off" :size="36" />
+      </span>
+      <h2 class="md-headline-small" :style="{ margin: 0 }">{{ t('peers.loadError') }}</h2>
+      <p class="md-body-medium txt-variant" :style="{ margin: 0, maxWidth: '420px' }">{{ t('peers.loadErrorBody') }}</p>
+      <MdButton variant="tonal" icon="refresh" :loading="retrying" @click="retry">{{ t('common.retry') }}</MdButton>
+    </div>
+
+    <!-- Empty (only when there is genuinely no data and no error) -->
     <div v-else-if="!peers.length" class="card card-outlined card-pad text-center col gap-4" :style="{ alignItems: 'center', padding: '56px 24px' }">
       <span :style="{ display: 'inline-flex', width: '72px', height: '72px', borderRadius: '24px', alignItems: 'center', justifyContent: 'center', background: 'var(--md-sys-color-surface-container-highest)', color: 'var(--md-sys-color-on-surface-variant)' }">
         <MdSym name="hub" :size="36" />
       </span>
       <h2 class="md-headline-small" :style="{ margin: 0 }">{{ t('peers.empty') }}</h2>
       <p class="md-body-medium txt-variant" :style="{ margin: 0, maxWidth: '420px' }">{{ t('peers.emptyBody') }}</p>
-      <MdButton variant="filled" icon="add" @click="navigateTo('/peers/new')">{{ t('peers.newPeer') }}</MdButton>
+      <MdButton v-if="creationEnabled" variant="filled" icon="add" @click="navigateTo('/peers/new')">{{ t('peers.newPeer') }}</MdButton>
     </div>
 
     <div v-else-if="!filtered.length" class="card card-outlined card-pad text-center txt-variant">

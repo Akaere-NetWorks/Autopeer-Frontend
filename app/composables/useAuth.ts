@@ -10,7 +10,13 @@ import { decodeJwt } from '~/utils/jwt'
  */
 export function useAuth() {
   const token = useCookie<string | null>('token', { sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 30 })
+  // The original admin token, parked here while an admin is logged in AS a user.
+  // Swapping it back into `token` (restoreAdmin) returns the admin to their session.
+  const adminToken = useCookie<string | null>('admin_token', { sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 30 })
   const user = useState<AuthUser | null>('auth-user', () => decodeUser(token.value))
+  // Shared with useApi via the same `useState` key so refresh can be skipped
+  // while impersonating (a user-scoped token must not refresh the admin cookie).
+  const isImpersonating = useState<boolean>('auth-impersonating', () => false)
   const cfg = useRuntimeConfig()
   const apiVersion = cfg.public.apiVersion as string
   const { apiFetch, refreshOnce } = useApi()
@@ -39,6 +45,38 @@ export function useAuth() {
   /** Re-derive user state from the token cookie (called on app init). */
   function hydrate() {
     user.value = decodeUser(token.value)
+    // A parked admin_token cookie means we booted mid-impersonation.
+    isImpersonating.value = !!adminToken.value
+  }
+
+  /**
+   * Log in AS a user (admin "login-as"). Parks the CURRENT admin token in the
+   * admin_token cookie BEFORE applySession overwrites `token`, so the admin can
+   * always return via restoreAdmin(). Without this, applySession would
+   * permanently destroy the admin session.
+   */
+  function impersonate(res: AuthResponse) {
+    if (token.value) adminToken.value = token.value
+    applySession(res)
+    isImpersonating.value = !!user.value
+    return res
+  }
+
+  /** Swap the parked admin token back into `token` and exit impersonation. */
+  function restoreAdmin() {
+    const saved = adminToken.value
+    const u = saved ? decodeUser(saved) : null
+    // Only restore if the parked token still decodes; otherwise clear both so we
+    // never leave a token cookie present with no user (a wedged half-auth state).
+    if (u) {
+      token.value = saved
+      user.value = u
+    } else {
+      token.value = null
+      user.value = null
+    }
+    adminToken.value = null
+    isImpersonating.value = false
   }
 
   // ── Email-code login ────────────────────────────────────────────────────────
@@ -141,16 +179,19 @@ export function useAuth() {
       // best-effort — clear locally regardless
     }
     token.value = null
+    adminToken.value = null
     user.value = null
+    isImpersonating.value = false
   }
 
   return {
-    token, user, isAuthenticated, isAdmin, asn,
+    token, user, isAuthenticated, isAdmin, asn, isImpersonating,
     hydrate, applySession, refreshOnce,
     requestCode, verifyCode,
     checkGpg, requestGpgChallenge, verifyGpg,
     passkeyLogin, passkeyStatus, passkeyRegister,
     adminLogin,
+    impersonate, restoreAdmin,
     deviceRequest, deviceAuthorize,
     loginStatus, turnstileConfig, logout,
   }

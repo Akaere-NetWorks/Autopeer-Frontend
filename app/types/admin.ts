@@ -403,6 +403,48 @@ export interface SchedulerEntrySnapshot {
   prev: string
 }
 
+/** One enqueue event for a scheduler entry (GET .../scheduler/{id}/events). */
+export interface EnqueueEventSnapshot {
+  task_id: string
+  enqueued_at: string
+}
+
+/** A single entry inside a peers export/import dump (admin peers import/export). */
+export interface PeerExportEntry {
+  node_id: string
+  node_name?: string
+  remote_asn: number
+  remote_pubkey: string
+  remote_endpoint: string
+  remote_lla: string
+  contact_email: string
+  wg_listen_port: number
+  wg_interface_name: string
+  bgp_proto_name?: string
+  bird_config_filename?: string
+  wg_managed: boolean
+  mtu?: number | null
+  wg_preshared_key?: string | null
+  status: string
+}
+
+/** Export wrapper produced by GET /api/v1/admin/peers/export. */
+export interface PeersExport {
+  version: number
+  exported_at: string
+  peers: PeerExportEntry[]
+}
+
+/** Result of POST /api/v1/admin/peers/import. */
+export interface PeersImportResult {
+  status: string
+  imported: number
+  overwritten: number
+  skipped: number
+  total: number
+  errors: { node_id: string, asn: number, reason: string }[]
+}
+
 export interface QueueOverview {
   enabled: boolean
   available: boolean

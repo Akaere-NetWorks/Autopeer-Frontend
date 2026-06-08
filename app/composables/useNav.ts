@@ -46,8 +46,11 @@ export function useNav() {
       },
     ]
     if (!isAdmin.value) return base
+    // Admins get a dedicated, admin-only navigation. We intentionally do NOT
+    // merge the user groups (My Peers / New Peering / Looking Glass / Security /
+    // Notifications / Audit / MCP Keys) — those rely on a populated user context
+    // that admins don't have, so they would render empty/broken.
     return [
-      ...base,
       {
         label: 'nav.sections.admin',
         items: [
@@ -55,6 +58,7 @@ export function useNav() {
           { icon: 'swap_horiz', label: 'nav.admin.peers', to: '/admin/peers' },
           { icon: 'dns', label: 'nav.admin.nodes', to: '/admin/nodes' },
           { icon: 'deployed_code', label: 'nav.admin.releases', to: '/admin/releases' },
+          { icon: 'notifications', label: 'admin.notifications.title', to: '/admin/notifications' },
           { icon: 'receipt_long', label: 'nav.admin.audit', to: '/admin/audit' },
         ],
       },

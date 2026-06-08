@@ -246,4 +246,34 @@ export interface TurnstileConfig {
   site_key: string
 }
 
+/** A registered passkey/WebAuthn credential (GET /api/v1/user/passkeys). */
+export interface PasskeyInfo {
+  id: string
+  name: string
+  aaguid: string
+  created_at: string
+  last_used_at?: string
+}
+
+/** DN42 registry ASN contact lookup (GET /api/v1/registry/asn/{asn}). */
+export interface RegistryAsnLookup {
+  asn: number
+  masked_email: string
+  /** Unmasked email — present only for admin callers. */
+  email?: string
+}
+
+/** One MCP audit entry (shared shape for user + admin MCP audit logs). */
+export interface McpAuditLog {
+  id: string
+  session_id?: string | null
+  asn?: number | null
+  admin_id?: string | null
+  tool_name: string
+  args?: unknown
+  result_ok: boolean
+  error_msg?: string | null
+  called_at: string
+}
+
 export type LookingGlassType = 'ping' | 'traceroute' | 'mtr' | 'bgp_route'

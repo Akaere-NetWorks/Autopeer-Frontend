@@ -2,18 +2,78 @@
 const { t } = useI18n()
 const api = useApi()
 const { fmtBytes } = useFormat()
+const { isAuthenticated, isAdmin } = useAuth()
 
-const { data, pending, error } = await useAsyncData('home', async () => {
+// Fetch public stats + nodes WITHOUT swallowing errors, so useAsyncData.error
+// reflects a real failure (a transient API error must be distinguishable from
+// a genuinely empty network). nodes.listPublic()/stats.public() self-heal a
+// stale anon cookie via opts.public, so a leftover token won't 401 us here.
+const { data, pending, error, refresh } = await useAsyncData('home', async () => {
   const [stats, nodes] = await Promise.all([
-    api.stats.public().catch(() => null),
-    api.nodes.listPublic().catch(() => [] as Awaited<ReturnType<typeof api.nodes.listPublic>>),
+    api.stats.public(),
+    api.nodes.listPublic(),
   ])
   return { stats, nodes }
-}, { server: false })
+}, { lazy: true, server: false })
 
 const stats = computed(() => data.value?.stats ?? null)
 const nodes = computed(() => data.value?.nodes ?? [])
 const totalNodes = computed(() => nodes.value.length)
+
+// Where the primary CTA should go: a logged-in admin/user lands on their
+// dashboard, a guest goes to sign-in.
+const ctaTarget = computed(() => {
+  if (!isAuthenticated.value) return '/login'
+  return isAdmin.value ? '/admin' : '/peers'
+})
+
+// --- Error recovery: automatic exponential backoff + manual retry ----------
+const retryCount = ref(0)
+const retrying = ref(false)
+const maxRetries = 3
+let retryTimer: ReturnType<typeof setTimeout> | null = null
+
+// True only when the load actually failed and we have surfaced it to the user
+// (i.e. not while a backoff retry is still in flight).
+const showError = computed(() => !!error.value && !retrying.value)
+
+function scheduleAutoRetry() {
+  if (retryCount.value >= maxRetries) {
+    retrying.value = false
+    return
+  }
+  retrying.value = true
+  retryCount.value++
+  retryTimer = setTimeout(async () => {
+    await refresh()
+    retrying.value = false
+    if (error.value) scheduleAutoRetry()
+  }, 1000 * retryCount.value)
+}
+
+// Kick off auto-retry the moment a failure appears; clear retry state on success.
+watch(error, (err) => {
+  if (err && retryCount.value < maxRetries && !retrying.value) {
+    scheduleAutoRetry()
+  } else if (!err) {
+    retryCount.value = 0
+    retrying.value = false
+    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null }
+  }
+})
+
+// Manual "Retry": reset the backoff counter and re-fetch immediately.
+async function reload() {
+  if (retryTimer) { clearTimeout(retryTimer); retryTimer = null }
+  retryCount.value = 0
+  retrying.value = true
+  await refresh()
+  retrying.value = false
+}
+
+onBeforeUnmount(() => {
+  if (retryTimer) clearTimeout(retryTimer)
+})
 
 const metrics = computed(() => {
   const s = stats.value
@@ -58,9 +118,9 @@ useHead({ title: t('landing.title') })
             v-ripple
             class="btn btn-lg"
             :style="{ background: 'var(--md-sys-color-on-primary-container)', color: 'var(--md-sys-color-primary-container)' }"
-            @click="navigateTo('/login')"
+            @click="navigateTo(ctaTarget)"
           >
-            <MdSym name="rocket_launch" /> <span>{{ t('landing.getStarted') }}</span>
+            <MdSym name="rocket_launch" /> <span>{{ isAuthenticated ? t('landing.goToDashboard') : t('landing.getStarted') }}</span>
           </button>
           <a
             v-ripple
@@ -76,8 +136,39 @@ useHead({ title: t('landing.title') })
       </div>
     </section>
 
-    <!-- Stats -->
-    <section class="stats-grid">
+    <!-- Load error: surfaced only after auto-retries are exhausted (or while not
+         actively retrying). Lets the user manually re-fetch instead of being
+         stuck on zeroed metrics / a false "no nodes" empty state. -->
+    <div
+      v-if="showError"
+      class="card card-outlined card-pad row gap-3 flex-wrap"
+      role="alert"
+      aria-live="polite"
+      :style="{ alignItems: 'center', borderColor: 'var(--md-sys-color-error)', color: 'var(--md-sys-color-on-error-container)', background: 'var(--md-sys-color-error-container)' }"
+    >
+      <MdSym name="cloud_off" :size="24" />
+      <div :style="{ flex: '1 1 240px' }">
+        <div class="md-title-small" :style="{ margin: 0 }">{{ t('landing.statsError') }}</div>
+        <div class="md-body-small" :style="{ margin: '2px 0 0', opacity: 0.9 }">{{ t('errors.network') }}</div>
+      </div>
+      <button v-ripple class="btn btn-tonal" @click="reload">
+        <MdSym name="refresh" /> <span>{{ t('common.retry') }}</span>
+      </button>
+    </div>
+
+    <!-- Retrying indicator (auto-backoff in flight) -->
+    <div
+      v-else-if="retrying"
+      class="card card-outlined card-pad row gap-3"
+      aria-live="polite"
+      :style="{ alignItems: 'center', color: 'var(--md-sys-color-on-surface-variant)' }"
+    >
+      <MdSym name="progress_activity" class="spinning" :size="22" />
+      <span class="md-body-medium">{{ t('landing.retrying') }}</span>
+    </div>
+
+    <!-- Stats (hidden while the error banner is showing) -->
+    <section v-if="!showError" class="stats-grid">
       <div v-for="m in metrics" :key="m.label" class="card card-elevated metric-tile">
         <div class="metric-label md-label-large">
           <span :style="{ display: 'inline-flex', width: '36px', height: '36px', borderRadius: '10px', alignItems: 'center', justifyContent: 'center', background: `var(--md-sys-color-${m.tone}-container)`, color: `var(--md-sys-color-on-${m.tone}-container)` }">
@@ -92,18 +183,20 @@ useHead({ title: t('landing.title') })
       </div>
     </section>
 
-    <!-- Error banner -->
-    <div v-if="error" class="card card-outlined card-pad" :style="{ color: 'var(--md-sys-color-on-surface-variant)' }">
-      <MdSym name="cloud_off" /> {{ t('errors.network') }}
-    </div>
-
     <!-- Nodes table -->
     <section class="card card-elevated">
       <div :style="{ padding: '20px 24px 8px' }">
         <h2 class="md-title-large" :style="{ margin: 0 }">{{ t('landing.nodesTitle') }}</h2>
         <p class="md-body-medium txt-variant" :style="{ margin: '4px 0 0' }">{{ t('landing.nodesSubtitle') }}</p>
       </div>
-      <div v-if="pending && !nodes.length" :style="{ padding: '16px 24px 24px' }" class="col gap-3">
+      <!-- Error: distinct from the empty state so a failed fetch never masquerades as an empty network -->
+      <div v-if="showError" class="col gap-3" :style="{ padding: '8px 24px 24px', alignItems: 'flex-start' }">
+        <p class="md-body-medium" :style="{ margin: 0, color: 'var(--md-sys-color-error)' }">{{ t('landing.nodesError') }}</p>
+        <button v-ripple class="btn btn-tonal" @click="reload">
+          <MdSym name="refresh" /> <span>{{ t('common.retry') }}</span>
+        </button>
+      </div>
+      <div v-else-if="data === null || retrying" :style="{ padding: '16px 24px 24px' }" class="col gap-3">
         <SkeletonBlock v-for="i in 4" :key="i" height="40px" />
       </div>
       <div v-else-if="!nodes.length" class="md-body-medium txt-variant" :style="{ padding: '8px 24px 24px' }">{{ t('landing.noNodes') }}</div>
@@ -135,7 +228,7 @@ useHead({ title: t('landing.title') })
     </section>
 
     <!-- Node performance -->
-    <section v-if="stats && stats.nodes.length" class="card card-elevated">
+    <section v-if="!showError && stats && stats.nodes.length" class="card card-elevated">
       <div :style="{ padding: '20px 24px 8px' }">
         <h2 class="md-title-large" :style="{ margin: 0 }">{{ t('landing.perfTitle') }}</h2>
         <p class="md-body-medium txt-variant" :style="{ margin: '4px 0 0' }">{{ t('landing.perfSubtitle') }}</p>

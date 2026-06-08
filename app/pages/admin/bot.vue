@@ -16,7 +16,7 @@ const { data, pending, refresh } = await useAsyncData('admin-bot', async () => {
     api.admin.bot.blocked().catch(() => ({ blocked_users: [] })),
   ])
   return { stats, settings, commands, blocked }
-}, { server: false })
+}, { lazy: true, server: false })
 
 const stats = computed(() => data.value?.stats)
 const settings = computed(() => data.value?.settings.settings ?? [])
@@ -73,7 +73,7 @@ async function copy(text: string) {
       </template>
     </PageHeader>
 
-    <div v-if="pending" class="col gap-3"><SkeletonBlock v-for="i in 4" :key="i" height="80px" radius="12px" /></div>
+    <div v-if="data === null" class="col gap-3"><SkeletonBlock v-for="i in 4" :key="i" height="80px" radius="12px" /></div>
 
     <template v-else>
       <section class="metric-3">

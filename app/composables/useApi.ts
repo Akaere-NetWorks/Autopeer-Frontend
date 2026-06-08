@@ -1,8 +1,10 @@
+import { decodeJwt, isTokenExpiringSoon } from '~/utils/jwt'
 import type {
   PublicNode, PublicStats, Peer, PeerSummaryItem, PeerMetrics,
   CreatePeerReq, CreatePeerResp, UpdatePeerReq, AuthSession, AuditPage,
   EmailPreferences, NotificationPreferences, TelegramBinding, TelegramNotificationPrefs,
-  McpKey, LookingGlassResult, LookingGlassType, AuthResponse,
+  McpKey, McpAuditLog, LookingGlassResult, LookingGlassType, AuthResponse,
+  PasskeyInfo, RegistryAsnLookup,
 } from '~/types/api'
 import type {
   AdminStats, AdminPeerListResponse, AdminPeerGetResponse, AdminUpdatePeerReq,
@@ -10,9 +12,23 @@ import type {
   ReleaseItem, BotSettingItem, BotStats, BotCommandEntry, BotBlockedUser,
   SiteSettingItem, NotificationSettingItem, AdminMcpKey, McpAuditLogEntry,
   SystemStatus, DBTablesResponse, QueueOverview, QueueSnapshot, TaskListSnapshot,
-  TaskSnapshot, ServerSnapshot, SchedulerEntrySnapshot, TaskState,
+  TaskSnapshot, ServerSnapshot, SchedulerEntrySnapshot, EnqueueEventSnapshot, TaskState,
   AssistantAuth, AssistantApprovalResponse, AssistantToolCallResponse, AssistantTool,
+  PeersImportResult,
 } from '~/types/admin'
+
+/** Pre-expiry skew (seconds) for the proactive refresh before authed requests. */
+const REFRESH_SKEW_SECONDS = 120
+/** Per-request timeout (ms) — resolves spinners/disabled buttons on a stalled fetch. */
+const REQUEST_TIMEOUT_MS = 30000
+
+/**
+ * Module-scoped single-flight refresh promise. N concurrent 401s (or proactive
+ * pre-expiry checks) collapse into exactly ONE POST /auth/refresh; everyone
+ * awaits the same rotated token instead of clobbering each other's rotation
+ * (parallel refreshes previously raced and spuriously logged the user out).
+ */
+let refreshPromise: Promise<boolean> | null = null
 
 /** Typed error parsed from the backend `{error, message, request_id}` body. */
 export class ApiError extends Error {
@@ -35,13 +51,37 @@ interface FetchOpts {
   body?: unknown
   query?: Record<string, unknown>
   headers?: Record<string, string>
+  /**
+   * Set ONLY on the refresh call itself so it never recurses into refresh-retry.
+   * Every other authenticated path participates in proactive + reactive refresh.
+   */
+  skipRefresh?: boolean
+  /**
+   * Public/anonymous endpoint (landing, stats): on 401 strip Authorization,
+   * clear the stale `token` cookie and retry once anonymously so a logged-out-
+   * but-stale cookie never blanks the page.
+   */
+  public?: boolean
+  /** When set, parse the response as a Blob (binary downloads, e.g. exports). */
+  responseType?: 'blob'
 }
 
 function toApiError(err: unknown): ApiError {
+  if (err instanceof ApiError) return err
+  // AbortSignal.timeout() rejects with a DOMException named 'TimeoutError'
+  // (older runtimes: 'AbortError'); surface it as a deterministic timeout so
+  // spinners and disabled buttons resolve instead of hanging forever. ofetch
+  // wraps the original abort in a FetchError, so also inspect err.cause.name.
+  const e0 = err as { name?: string, cause?: { name?: string } }
+  const abortName = e0?.name === 'TimeoutError' || e0?.name === 'AbortError'
+    ? e0.name
+    : (e0?.cause?.name === 'TimeoutError' || e0?.cause?.name === 'AbortError' ? e0.cause.name : null)
+  if (abortName) {
+    return new ApiError(0, 'timeout', 'Request timed out')
+  }
   const e = err as { response?: { status?: number }, status?: number, statusCode?: number, data?: Record<string, unknown> }
   const status = e?.response?.status ?? e?.statusCode ?? e?.status ?? 0
   const data = (e?.data ?? {}) as Record<string, unknown>
-  if (err instanceof ApiError) return err
   const code = typeof data.error === 'string' ? data.error : (status === 0 ? 'network' : 'error')
   const message = typeof data.message === 'string' ? data.message : (status === 0 ? 'Network error' : 'Request failed')
   const requestId = typeof data.request_id === 'string' ? data.request_id : undefined
@@ -52,12 +92,21 @@ export function useApi() {
   const token = useCookie<string | null>('token', { sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 30 })
   const cfg = useRuntimeConfig()
   const apiVersion = cfg.public.apiVersion as string
+  // Shared with useAuth via the same key. While impersonating, `token` is a
+  // user-scoped login-as token whose refresh cookie belongs to the admin, so
+  // refreshing would mint the WRONG identity — skip it entirely.
+  const isImpersonating = useState<boolean>('auth-impersonating', () => false)
 
-  async function refreshOnce(): Promise<boolean> {
+  /**
+   * Perform a single POST /auth/refresh and rotate the `token` cookie.
+   * Wrapped by `refresh()` so concurrent callers share one in-flight request.
+   */
+  async function doRefresh(): Promise<boolean> {
     try {
       const res = await $fetch<{ access_token?: string, token?: string }>('/api/v1/auth/refresh', {
         method: 'POST',
         headers: { 'Autopeer-Version': apiVersion },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       })
       const next = res.access_token || res.token
       if (next) {
@@ -71,8 +120,38 @@ export function useApi() {
     }
   }
 
+  /**
+   * Single-flight refresh: collapses concurrent refresh attempts into ONE POST
+   * /auth/refresh shared via the module-scoped `refreshPromise`. Skips entirely
+   * while impersonating (the refresh cookie belongs to the admin, not the
+   * impersonated user — refreshing would mint the wrong identity).
+   */
+  function refresh(): Promise<boolean> {
+    if (isImpersonating.value) return Promise.resolve(false)
+    if (!refreshPromise) {
+      refreshPromise = doRefresh().finally(() => { refreshPromise = null })
+    }
+    return refreshPromise
+  }
+
+  /** Back-compat alias kept on the return surface for existing callers. */
+  const refreshOnce = refresh
+
   async function apiFetch<T>(path: string, opts: FetchOpts = {}, _retry = false): Promise<T> {
     const headers: Record<string, string> = { 'Autopeer-Version': apiVersion, ...(opts.headers || {}) }
+
+    // (2) Proactive pre-expiry refresh before an authenticated request: if the
+    // current access token is within REFRESH_SKEW_SECONDS of expiry, rotate it
+    // first (single-flight) and use the fresh token. Falls back to the reactive
+    // 401 path below if this refresh fails. Skipped for the refresh call itself,
+    // public endpoints, retries, and on the server.
+    if (
+      import.meta.client && !opts.skipRefresh && !opts.public && !_retry
+      && token.value && isTokenExpiringSoon(decodeJwt(token.value), REFRESH_SKEW_SECONDS)
+    ) {
+      await refresh()
+    }
+
     if (token.value) headers.Authorization = `Bearer ${token.value}`
     try {
       const res = await $fetch(path, {
@@ -80,14 +159,27 @@ export function useApi() {
         body: opts.body as never,
         query: opts.query,
         headers,
+        responseType: opts.responseType,
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       })
       return res as T
     } catch (err) {
       const apiErr = toApiError(err)
-      const isAuthPath = path.includes('/auth/')
-      if (apiErr.status === 401 && !_retry && !isAuthPath && import.meta.client && token.value) {
-        const ok = await refreshOnce()
-        if (ok) return apiFetch<T>(path, opts, true)
+      if (apiErr.status === 401 && !_retry && import.meta.client) {
+        // (4) Reactive refresh-retry — gated by an explicit skipRefresh flag set
+        // ONLY on the refresh call, so /auth/admin/devices and admin login-as
+        // still participate (the old broad `/auth/` path check excluded them).
+        if (!opts.skipRefresh && !opts.public && token.value) {
+          const ok = await refresh()
+          if (ok) return apiFetch<T>(path, opts, true)
+        }
+        // (5) Public endpoint with a stale cookie: drop the bad token, clear the
+        // cookie, and retry once anonymously so the landing/stats never blank.
+        // Clearing token.value means the retry omits the Authorization header.
+        if (opts.public && token.value) {
+          token.value = null
+          return apiFetch<T>(path, opts, true)
+        }
       }
       throw apiErr
     }
@@ -95,11 +187,11 @@ export function useApi() {
 
   // ── Endpoint groups (typed) ────────────────────────────────────────────────
   const nodes = {
-    listPublic: () => apiFetch<PublicNode[]>('/api/v1/nodes'),
+    listPublic: () => apiFetch<PublicNode[]>('/api/v1/nodes', { public: true }),
   }
 
   const stats = {
-    public: () => apiFetch<PublicStats>('/api/v1/stats'),
+    public: () => apiFetch<PublicStats>('/api/v1/stats', { public: true }),
   }
 
   const peers = {
@@ -145,6 +237,22 @@ export function useApi() {
     create: (body: { name: string, expires_at?: string | null, capabilities?: string[] }) =>
       apiFetch<McpKey>('/api/v1/user/mcp-keys', { method: 'POST', body }),
     remove: (id: string) => apiFetch<{ message: string }>(`/api/v1/user/mcp-keys/${id}`, { method: 'DELETE' }),
+    // USER scope: latest 200 MCP audit entries for the caller's own ASN. The
+    // backend returns a bare array and ignores filters (admin.mcpKeys.auditLogs
+    // is the paginated/filterable variant); `query` is accepted to mirror that
+    // shape and is harmless when the server ignores it.
+    auditLogs: (query: { tool?: string, page?: number, per_page?: number } = {}) =>
+      apiFetch<McpAuditLog[]>('/api/v1/user/mcp-audit-logs', { query }),
+  }
+
+  const passkeys = {
+    list: () => apiFetch<{ passkeys: PasskeyInfo[] }>('/api/v1/user/passkeys'),
+    remove: (id: string) => apiFetch<{ success: boolean }>(`/api/v1/user/passkeys/${id}`, { method: 'DELETE' }),
+  }
+
+  const registry = {
+    // Public DN42 registry ASN lookup; `email` is unmasked only for admins.
+    lookupASN: (asn: number) => apiFetch<RegistryAsnLookup>(`/api/v1/registry/asn/${asn}`, { public: true }),
   }
 
   // ── Admin endpoint groups ──────────────────────────────────────────────────
@@ -166,6 +274,14 @@ export function useApi() {
       setContactEmail: (id: string, body: { email?: string, retry?: boolean }) =>
         apiFetch<{ email: string }>(`${A}/peers/${id}/contact-email`, { method: 'PUT', body }),
       exportUrl: () => `${A}/peers/export`,
+      // Import a peers dump (export wrapper object or a bare array of entries).
+      // `overwrite=true` updates existing peers; otherwise existing peers skip.
+      import: (payload: unknown, overwrite = false) =>
+        apiFetch<PeersImportResult>(`${A}/peers/import`, { method: 'POST', body: payload, query: { overwrite: String(overwrite) } }),
+      // Fetch the export WITH the admin auth header and return a Blob (the bare
+      // URL from exportUrl() is unauthenticated and would 401). Callers turn the
+      // Blob into a download via URL.createObjectURL.
+      exportBlob: () => apiFetch<Blob>(`${A}/peers/export`, { responseType: 'blob' }),
     },
 
     nodes: {
@@ -248,6 +364,9 @@ export function useApi() {
       task: (name: string, taskID: string) => apiFetch<TaskSnapshot>(`${A}/queue/queues/${name}/tasks/${taskID}`),
       servers: () => apiFetch<ServerSnapshot[]>(`${A}/queue/servers`),
       scheduler: () => apiFetch<SchedulerEntrySnapshot[]>(`${A}/queue/scheduler`),
+      // Paginated enqueue events for one scheduler entry; returns a bare array.
+      schedulerEvents: (entryID: string, page = 1, size = 20) =>
+        apiFetch<EnqueueEventSnapshot[]>(`${A}/queue/scheduler/${entryID}/events`, { query: { page, size } }),
       deleteTask: (name: string, taskID: string) => apiFetch<{ status: string }>(`${A}/queue/queues/${name}/tasks/${taskID}`, { method: 'DELETE' }),
       runTask: (name: string, taskID: string) => apiFetch<{ status: string }>(`${A}/queue/queues/${name}/tasks/${taskID}:run`, { method: 'POST' }),
       archiveTask: (name: string, taskID: string) => apiFetch<{ status: string }>(`${A}/queue/queues/${name}/tasks/${taskID}:archive`, { method: 'POST' }),
@@ -266,5 +385,5 @@ export function useApi() {
       apiFetch<AssistantToolCallResponse>('/api/v1/user/assistant/tools/call', { method: 'POST', body: { tool_name, arguments: args, conversation_id, approval_token } }),
   }
 
-  return { apiFetch, refreshOnce, nodes, stats, peers, account, telegram, lookingGlass, mcp, admin, assistant }
+  return { apiFetch, refreshOnce, nodes, stats, peers, account, telegram, lookingGlass, mcp, passkeys, registry, admin, assistant }
 }

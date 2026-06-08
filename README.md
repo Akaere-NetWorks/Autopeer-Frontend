@@ -1,5 +1,9 @@
 # AutoPeer Frontend (open-source)
 
+> [!WARNING]
+> **This frontend was built autonomously by Claude (AI) — "on autopilot", with no human authoring the code.**
+> Review the source and **assess the risks yourself before using or deploying it.**
+
 A production-quality, server-side-rendered web frontend for **[AutoPeer](https://autopeer.su)** —
 an automated [DN42](https://dn42.dev) BGP peering control plane. Built with **Nuxt 4 (Vue 3) +
 Nitro**, styled in **Material Design 3**, trilingual (English / 简体中文 / 繁體中文), and ready to
