@@ -19,7 +19,7 @@ const { data, pending, error } = await useAsyncData('peers', async () => {
   ])
   const byId = new Map(summary.map((s) => [s.peer_id, s]))
   return peers.map((p) => ({ ...p, _summary: byId.get(p.id) ?? null }))
-})
+}, { server: false })
 
 if (error.value) toast.error(error.value)
 

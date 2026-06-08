@@ -14,7 +14,7 @@ const extra = ref<AuditLog[]>([]) // pages loaded beyond the first
 const loadingMore = ref(false)
 
 // First page lives inside the asyncData payload so SSR and client hydration agree.
-const { data, pending } = await useAsyncData('audit', () => api.account.audit({ page: 1, per_page: PER_PAGE }))
+const { data, pending } = await useAsyncData('audit', () => api.account.audit({ page: 1, per_page: PER_PAGE }), { server: false })
 
 const logs = computed<AuditLog[]>(() => [...(data.value?.logs ?? []), ...extra.value])
 const total = computed(() => data.value?.total ?? 0)

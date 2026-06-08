@@ -21,11 +21,11 @@ const RANGES: { value: string, hours: number }[] = [
 const range = ref('24h')
 const rangeHours = computed(() => RANGES.find((r) => r.value === range.value)?.hours ?? 24)
 
-const { data: peer, error, refresh } = await useAsyncData(`peer-${id.value}`, () => api.peers.get(id.value))
+const { data: peer, error, refresh } = await useAsyncData(`peer-${id.value}`, () => api.peers.get(id.value), { server: false })
 const { data: metrics } = await useAsyncData(
   () => `peer-metrics-${id.value}-${range.value}`,
   () => api.peers.metrics(id.value, rangeHours.value).catch(() => null),
-  { watch: [range] },
+  { watch: [range], server: false },
 )
 
 const notFound = computed(() => {

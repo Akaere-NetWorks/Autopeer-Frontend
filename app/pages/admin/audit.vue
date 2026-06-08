@@ -13,7 +13,7 @@ const actionFilter = ref('')
 const { data, pending } = await useAsyncData(
   'admin-audit',
   () => api.admin.audit({ action: actionFilter.value || undefined, page: page.value, per_page: PER_PAGE }),
-  { watch: [page, actionFilter] },
+  { watch: [page, actionFilter], server: false },
 )
 watch(actionFilter, () => { page.value = 1 })
 

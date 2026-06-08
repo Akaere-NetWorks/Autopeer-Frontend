@@ -22,7 +22,7 @@ const viewOptions = computed(() => [
 ])
 
 // ── Admin keys ────────────────────────────────────────────────────────────────
-const { data: adminKeys, pending: loadingAdmin, refresh: refreshAdmin } = await useAsyncData('admin-mcp-keys', () => api.admin.mcpKeys.list())
+const { data: adminKeys, pending: loadingAdmin, refresh: refreshAdmin } = await useAsyncData('admin-mcp-keys', () => api.admin.mcpKeys.list(), { server: false })
 const showCreate = ref(false)
 const newName = ref('')
 const newCaps = ref<string[]>([...ADMIN_CAPS.slice(0, 6)])
@@ -53,7 +53,7 @@ const userAsn = ref('')
 const { data: userKeys, pending: loadingUser, refresh: refreshUser } = await useAsyncData(
   'admin-user-mcp-keys',
   () => api.admin.mcpKeys.userKeys(userAsn.value ? Number(userAsn.value) : undefined),
-  { watch: [userAsn] },
+  { watch: [userAsn], server: false },
 )
 const revokeUserFor = ref<McpKey | null>(null)
 async function doRevokeUser() {
@@ -62,7 +62,7 @@ async function doRevokeUser() {
 }
 
 // ── Audit logs ────────────────────────────────────────────────────────────────
-const { data: auditData, pending: loadingAudit } = await useAsyncData('admin-mcp-audit', () => api.admin.mcpKeys.auditLogs({ per_page: 50 }))
+const { data: auditData, pending: loadingAudit } = await useAsyncData('admin-mcp-audit', () => api.admin.mcpKeys.auditLogs({ per_page: 50 }), { server: false })
 const auditLogs = computed(() => auditData.value?.logs ?? [])
 
 async function copy(text: string) {

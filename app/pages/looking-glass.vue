@@ -8,7 +8,7 @@ const api = useApi()
 const toast = useToast()
 const tfBg = 'var(--md-sys-color-surface-container-low)'
 
-const { data: nodes } = await useAsyncData('lg-nodes', () => api.nodes.listPublic().catch(() => []))
+const { data: nodes } = await useAsyncData('lg-nodes', () => api.nodes.listPublic().catch(() => []), { server: false })
 const onlineNodes = computed(() => (nodes.value ?? []).filter((n) => n.online))
 
 const nodeId = ref('')

@@ -7,7 +7,7 @@ const toast = useToast()
 const cfg = useRuntimeConfig()
 const { relTime, fmtDate } = useFormat()
 
-const { data: keys, pending, refresh } = await useAsyncData('mcp-keys', () => api.mcp.list().catch(() => []))
+const { data: keys, pending, refresh } = await useAsyncData('mcp-keys', () => api.mcp.list().catch(() => []), { server: false })
 const activeKeys = computed(() => (keys.value ?? []).filter((k) => !k.revoked_at))
 
 const CAPS = [

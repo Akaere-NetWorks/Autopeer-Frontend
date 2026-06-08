@@ -8,7 +8,7 @@ const api = useApi()
 const toast = useToast()
 const { fmtBytes, relTime } = useFormat()
 
-const { data, pending, refresh } = await useAsyncData('admin-releases', () => api.admin.releases.list())
+const { data, pending, refresh } = await useAsyncData('admin-releases', () => api.admin.releases.list(), { server: false })
 const releases = computed(() => data.value?.releases ?? [])
 
 const showUpload = ref(false)

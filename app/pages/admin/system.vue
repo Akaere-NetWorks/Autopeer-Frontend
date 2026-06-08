@@ -6,8 +6,8 @@ const api = useApi()
 const toast = useToast()
 const { fmtBytes, fmtUptime, relTime } = useFormat()
 
-const { data: sys, pending, refresh } = await useAsyncData('admin-system', () => api.admin.system.status())
-const { data: tables } = await useAsyncData('admin-db-tables', () => api.admin.system.dbTables(30).catch(() => null))
+const { data: sys, pending, refresh } = await useAsyncData('admin-system', () => api.admin.system.status(), { server: false })
+const { data: tables } = await useAsyncData('admin-db-tables', () => api.admin.system.dbTables(30).catch(() => null), { server: false })
 
 const subsystems = computed(() => {
   const s = sys.value

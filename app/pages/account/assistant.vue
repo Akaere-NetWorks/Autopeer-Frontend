@@ -7,7 +7,7 @@ const { t } = useI18n()
 const api = useApi()
 const toast = useToast()
 
-const { data: auth, error: authError } = await useAsyncData('assistant-auth', () => api.assistant.auth())
+const { data: auth, error: authError } = await useAsyncData('assistant-auth', () => api.assistant.auth(), { server: false })
 const available = computed(() => !authError.value && auth.value?.ok)
 
 const tools: { value: AssistantTool, label: string, needsId?: boolean, needsHours?: boolean }[] = [

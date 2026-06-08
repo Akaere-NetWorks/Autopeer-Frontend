@@ -9,7 +9,7 @@ const { data, pending, error } = await useAsyncData('home', async () => {
     api.nodes.listPublic().catch(() => [] as Awaited<ReturnType<typeof api.nodes.listPublic>>),
   ])
   return { stats, nodes }
-})
+}, { server: false })
 
 const stats = computed(() => data.value?.stats ?? null)
 const nodes = computed(() => data.value?.nodes ?? [])

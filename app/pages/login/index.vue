@@ -24,7 +24,7 @@ const turnstileToken = ref('')
 const submitting = ref(false)
 const captchaRef = ref<{ reset: () => void } | null>(null)
 
-const { data: tsConfig } = await useAsyncData('turnstile', () => auth.turnstileConfig().catch(() => ({ enabled: false, site_key: '' })))
+const { data: tsConfig } = await useAsyncData('turnstile', () => auth.turnstileConfig().catch(() => ({ enabled: false, site_key: '' })), { server: false })
 
 // Detect passkey support only AFTER mount so SSR and the first client render
 // agree (both false) — otherwise the method segmented control hydration-mismatches.

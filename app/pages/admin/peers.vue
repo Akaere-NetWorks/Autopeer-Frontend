@@ -19,7 +19,7 @@ const perPage = 20
 const { data, pending, refresh } = await useAsyncData(
   'admin-peers',
   () => api.admin.peers.list({ status: filter.value === 'all' ? undefined : filter.value, page: page.value, per_page: perPage }),
-  { watch: [filter, page] },
+  { watch: [filter, page], server: false },
 )
 watch(filter, () => { page.value = 1 })
 

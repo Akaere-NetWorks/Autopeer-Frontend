@@ -15,7 +15,7 @@ const viewOptions = computed(() => [
   { value: 'scheduler', label: t('admin.queue.scheduler'), icon: 'schedule' },
 ])
 
-const { data: overview, pending, refresh } = await useAsyncData('admin-queue', () => api.admin.queue.overview())
+const { data: overview, pending, refresh } = await useAsyncData('admin-queue', () => api.admin.queue.overview(), { server: false })
 const available = computed(() => overview.value?.available !== false && overview.value?.enabled !== false)
 const queues = computed(() => overview.value?.queues ?? [])
 const servers = computed(() => overview.value?.servers ?? [])
@@ -37,7 +37,7 @@ const taskState = ref<TaskState>('pending')
 const { data: taskList, pending: loadingTasks, refresh: refreshTasks } = await useAsyncData(
   'admin-queue-tasks',
   () => selected.value ? api.admin.queue.tasks(selected.value, taskState.value, 1, 25) : Promise.resolve(null),
-  { watch: [selected, taskState] },
+  { watch: [selected, taskState], server: false },
 )
 const stateOptions = computed(() => (['pending', 'active', 'scheduled', 'retry', 'archived', 'completed'] as TaskState[]).map((s) => ({ value: s, label: t(`admin.queue.${s}`) })))
 

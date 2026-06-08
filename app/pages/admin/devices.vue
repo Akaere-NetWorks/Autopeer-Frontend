@@ -9,7 +9,7 @@ const toast = useToast()
 const auth = useAuth()
 const { relTime, fmtDate } = useFormat()
 
-const { data, pending, refresh } = await useAsyncData('admin-devices', () => api.admin.devices.list())
+const { data, pending, refresh } = await useAsyncData('admin-devices', () => api.admin.devices.list(), { server: false })
 const sessions = computed(() => data.value ?? [])
 const busy = ref<string | null>(null)
 

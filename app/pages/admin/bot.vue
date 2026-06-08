@@ -16,7 +16,7 @@ const { data, pending, refresh } = await useAsyncData('admin-bot', async () => {
     api.admin.bot.blocked().catch(() => ({ blocked_users: [] })),
   ])
   return { stats, settings, commands, blocked }
-})
+}, { server: false })
 
 const stats = computed(() => data.value?.stats)
 const settings = computed(() => data.value?.settings.settings ?? [])

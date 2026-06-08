@@ -4,7 +4,7 @@ definePageMeta({ middleware: 'admin', title: 'nav.admin.overview' })
 const { t } = useI18n()
 const api = useApi()
 
-const { data: stats, pending } = await useAsyncData('admin-stats', () => api.admin.stats())
+const { data: stats, pending } = await useAsyncData('admin-stats', () => api.admin.stats(), { server: false })
 
 useHead({ title: t('admin.overview.title') })
 

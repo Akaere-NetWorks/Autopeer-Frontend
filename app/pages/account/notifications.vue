@@ -16,7 +16,7 @@ const { data, refresh } = await useAsyncData('notif', async () => {
   let tg: Awaited<ReturnType<typeof api.telegram.notificationPrefs>> | null = null
   if (binding.bound) tg = await api.telegram.notificationPrefs().catch(() => null)
   return { email, binding, tg }
-})
+}, { server: false })
 
 // ── Email catalog ────────────────────────────────────────────────────────────
 const emailOptions = ref<NotificationOption[]>([])

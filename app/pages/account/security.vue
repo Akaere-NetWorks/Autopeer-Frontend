@@ -14,7 +14,7 @@ const currentSid = computed(() => {
   return p?.sid || p?.jti || null
 })
 
-const { data: devices, pending, refresh } = await useAsyncData('devices', () => api.account.devices().catch(() => []))
+const { data: devices, pending, refresh } = await useAsyncData('devices', () => api.account.devices().catch(() => []), { server: false })
 
 function deviceIcon(name?: string) {
   const s = (name || '').toLowerCase()

@@ -11,7 +11,7 @@ const { data } = await useAsyncData('new-peer-bootstrap', async () => {
     api.peers.creationStatus().catch(() => ({ enabled: true })),
   ])
   return { nodes, gate }
-})
+}, { server: false })
 
 const nodes = computed(() => data.value?.nodes ?? [])
 const creationEnabled = computed(() => data.value?.gate?.enabled !== false)

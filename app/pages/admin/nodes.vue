@@ -8,7 +8,7 @@ const api = useApi()
 const toast = useToast()
 const { relTime, fmtUptime } = useFormat()
 
-const { data, pending, refresh } = await useAsyncData('admin-nodes', () => api.admin.nodes.list())
+const { data, pending, refresh } = await useAsyncData('admin-nodes', () => api.admin.nodes.list(), { server: false })
 const nodes = computed(() => data.value ?? [])
 
 const busy = ref<string | null>(null)

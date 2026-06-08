@@ -5,7 +5,7 @@ const { t } = useI18n()
 const api = useApi()
 const toast = useToast()
 
-const { data, pending, refresh } = await useAsyncData('admin-settings', () => api.admin.settings.list())
+const { data, pending, refresh } = await useAsyncData('admin-settings', () => api.admin.settings.list(), { server: false })
 const drafts = reactive<Record<string, string>>({})
 watchEffect(() => {
   for (const s of data.value?.settings ?? []) if (!(s.key in drafts)) drafts[s.key] = s.value
