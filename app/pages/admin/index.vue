@@ -12,12 +12,13 @@ useHead({ title: t('admin.overview.title') })
 
 const tiles = computed(() => {
   const s = stats.value
+  // Every count tile links to the list it counts, so the numbers are drill-downable.
   return [
-    { icon: 'check_circle', tone: 'primary', label: t('admin.overview.activePeers'), value: s?.peers_active ?? 0 },
+    { icon: 'check_circle', tone: 'primary', label: t('admin.overview.activePeers'), value: s?.peers_active ?? 0, to: '/admin/peers?status=active' },
     { icon: 'hourglass_top', tone: 'tertiary', label: t('admin.overview.pending'), value: s?.peers_pending ?? 0, to: '/admin/peers?status=pending' },
-    { icon: 'pause_circle', tone: 'tertiary', label: t('admin.overview.suspended'), value: s?.peers_suspended ?? 0 },
-    { icon: 'cancel', tone: 'primary', label: t('admin.overview.rejected'), value: s?.peers_rejected ?? 0 },
-    { icon: 'dns', tone: 'primary', label: t('admin.overview.nodesOnline'), value: `${s?.nodes_online ?? 0}/${s?.nodes_total ?? 0}` },
+    { icon: 'pause_circle', tone: 'tertiary', label: t('admin.overview.suspended'), value: s?.peers_suspended ?? 0, to: '/admin/peers?status=suspended' },
+    { icon: 'cancel', tone: 'primary', label: t('admin.overview.rejected'), value: s?.peers_rejected ?? 0, to: '/admin/peers?status=rejected' },
+    { icon: 'dns', tone: 'primary', label: t('admin.overview.nodesOnline'), value: `${s?.nodes_online ?? 0}/${s?.nodes_total ?? 0}`, to: '/admin/nodes' },
     { icon: 'fiber_new', tone: 'tertiary', label: t('admin.overview.newToday'), value: s?.new_today ?? 0 },
   ]
 })

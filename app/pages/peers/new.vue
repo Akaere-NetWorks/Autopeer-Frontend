@@ -1,10 +1,13 @@
 <script setup lang="ts">
+import type { CreatePeerResp } from '~/types/api'
+
 definePageMeta({ middleware: 'auth', title: 'nav.newPeering' })
 
 const { t } = useI18n()
 const api = useApi()
 const auth = useAuth()
 const toast = useToast()
+const { meta: statusMeta } = usePeerStatus()
 
 const { data } = await useAsyncData('new-peer-bootstrap', async () => {
   const [nodes, gate] = await Promise.all([
@@ -22,13 +25,15 @@ const form = reactive({ node_id: '', pubkey: '', endpoint: '', lla: '', mtu: '',
 const submitting = ref(false)
 const tfBg = 'var(--md-sys-color-surface-container-low)'
 
-const steps = [t('peerNew.steps.selectNode'), t('peerNew.steps.configure'), t('peerNew.steps.review')]
+const steps = [t('peerNew.steps.selectNode'), t('peerNew.steps.configure'), t('peerNew.steps.review'), t('peerNew.steps.done')]
 const node = computed(() => nodes.value.find((n) => n.id === form.node_id) || null)
 const nodeSelectable = computed(() => !!node.value && node.value.online)
 
 // If the selected node disappears or goes offline on a data refetch, drop it so
-// the wizard can never advance/submit with a stale offline selection.
+// the wizard can never advance/submit with a stale offline selection. After
+// creation the selection must survive so the done step keeps its config.
 watch(nodes, () => {
+  if (created.value) return
   if (form.node_id && !nodeSelectable.value) form.node_id = ''
 })
 
@@ -49,8 +54,26 @@ const computedPort = computed(() => {
   return String(prefix * 10000 + (asn % 10000))
 })
 
-// Ready-to-paste WireGuard config (local side). PSK is added after creation.
-const wgConfigPreview = computed(() => {
+// Creation result; once set, the wizard moves to the final "done" step which
+// shows the complete ready-to-paste config (incl. the generated PSK).
+const created = ref<CreatePeerResp | null>(null)
+
+// Our-side parameters the user needs to configure their router ([label, value]).
+const ourRows = computed(() => {
+  const n = node.value
+  if (!n) return []
+  const endpoint = computedPort.value ? `${n.public_ip}:${computedPort.value}` : n.public_ip
+  return [
+    [t('peerNew.our.asn'), `AS${n.our_asn}`],
+    [t('peerNew.our.endpoint'), endpoint],
+    [t('peerNew.our.pubkey'), n.our_wg_pubkey],
+    [t('peerNew.our.lla'), n.our_lla],
+  ] as [string, string][]
+})
+
+// Ready-to-paste WireGuard config (local side). Before creation the PSK is a
+// placeholder; the done step re-renders it with the generated key.
+function buildWgConfig(psk: string | null): string {
   const n = node.value
   if (!n) return ''
   const asn = auth.asn.value
@@ -62,14 +85,16 @@ const wgConfigPreview = computed(() => {
   ]
   if (form.mtu) lines.push(`MTU = ${form.mtu}`)
   lines.push('Table = off', '', '[Peer]', `PublicKey = ${n.our_wg_pubkey}`)
-  if (form.psk) lines.push(`PresharedKey = <${t('peerNew.pskAfterCreate')}>`)
+  if (form.psk) lines.push(`PresharedKey = ${psk ?? `<${t('peerNew.pskAfterCreate')}>`}`)
   lines.push(
     'AllowedIPs = 172.20.0.0/14, fd00::/8, fe80::/10',
     `Endpoint = ${n.public_ip}:${computedPort.value}`,
     'PersistentKeepalive = 25',
   )
   return lines.join('\n')
-})
+}
+const wgConfigPreview = computed(() => buildWgConfig(null))
+const finalWgConfig = computed(() => buildWgConfig(created.value?.wg_preshared_key ?? null))
 
 // Ready-to-paste BIRD BGP protocol block.
 const birdConfigPreview = computed(() => {
@@ -83,11 +108,6 @@ const birdConfigPreview = computed(() => {
   ].join('\n')
 })
 
-// Success / PSK reveal
-const createdPsk = ref<string | null>(null)
-const createdId = ref<string | null>(null)
-const showCreated = ref(false)
-
 async function submit() {
   // Defensive re-validation at the submit boundary: never POST an invalid form
   // even if step state was reached out of band (mirrors closed handleSubmit).
@@ -98,7 +118,7 @@ async function submit() {
   }
   submitting.value = true
   try {
-    const res = await api.peers.create({
+    created.value = await api.peers.create({
       node_id: form.node_id,
       remote_pubkey: form.pubkey.trim(),
       remote_endpoint: form.endpoint.trim(),
@@ -106,24 +126,13 @@ async function submit() {
       mtu: form.mtu ? Number(form.mtu) : null,
       enable_psk: form.psk,
     })
-    createdId.value = res.id
-    if (res.wg_preshared_key) {
-      createdPsk.value = res.wg_preshared_key
-      showCreated.value = true
-    } else {
-      toast.show(t('peerNew.createdTitle'))
-      await navigateTo(`/peers/${res.id}`)
-    }
+    step.value = 3
+    toast.show(t('peerNew.createdTitle'))
   } catch (e) {
     toast.error(e)
   } finally {
     submitting.value = false
   }
-}
-
-async function finishCreated() {
-  showCreated.value = false
-  await navigateTo(createdId.value ? `/peers/${createdId.value}` : '/peers')
 }
 
 const reviewRows = computed(() => [
@@ -201,6 +210,22 @@ const reviewRows = computed(() => [
         <!-- Step 1: configure -->
         <div v-else-if="step === 1">
           <h3 class="md-title-large" :style="{ margin: '0 0 20px' }">{{ t('peerNew.configTitle') }}</h3>
+
+          <!-- Our-side parameters: what the user needs to configure their router -->
+          <div :style="{ marginBottom: '22px', borderRadius: '16px', background: 'var(--md-sys-color-secondary-container)', color: 'var(--md-sys-color-on-secondary-container)', padding: '16px 18px' }">
+            <div class="md-title-small row gap-2" :style="{ alignItems: 'center' }">
+              <MdSym name="dns" :size="18" fill /> {{ t('peerNew.ourInfoTitle') }}
+            </div>
+            <div class="md-body-small" :style="{ marginTop: '2px', opacity: 0.85 }">{{ t('peerNew.ourInfoBody') }}</div>
+            <div class="col" :style="{ marginTop: '10px' }">
+              <div v-for="row in ourRows" :key="row[0]" class="row gap-3" :style="{ padding: '7px 0', alignItems: 'center' }">
+                <div class="md-label-large" :style="{ width: '130px', flexShrink: 0, opacity: 0.85 }">{{ row[0] }}</div>
+                <div class="md-body-medium mono" :style="{ flex: 1, wordBreak: 'break-all' }">{{ row[1] }}</div>
+                <MdCopyButton :value="row[1]" :size="28" />
+              </div>
+            </div>
+          </div>
+
           <div class="col" :style="{ gap: '22px' }">
             <MdTextField v-model="form.pubkey" :label="t('peerNew.pubkey')" :placeholder="t('peerNew.pubkeyPlaceholder')" mono icon="key" :tf-bg="tfBg" :error="pubkeyError" :supporting="t('peerNew.pubkeySupport')" />
             <MdTextField v-model="form.endpoint" :label="t('peerNew.endpoint')" :placeholder="t('peerNew.endpointPlaceholder')" mono icon="lan" :tf-bg="tfBg" :error="endpointError" :supporting="t('peerNew.endpointSupport')" />
@@ -221,8 +246,10 @@ const reviewRows = computed(() => [
         </div>
 
         <!-- Step 2: review -->
-        <div v-else>
+        <div v-else-if="step === 2">
           <h3 class="md-title-large" :style="{ margin: '0 0 16px' }">{{ t('peerNew.reviewTitle') }}</h3>
+
+          <div class="md-label-large txt-variant" :style="{ margin: '0 0 8px' }">{{ t('peerNew.reviewYours') }}</div>
           <div :style="{ borderRadius: '16px', border: '1px solid var(--md-sys-color-outline-variant)', overflow: 'hidden' }">
             <div
               v-for="(row, i) in reviewRows"
@@ -232,6 +259,20 @@ const reviewRows = computed(() => [
             >
               <div class="md-body-medium txt-variant" :style="{ width: '140px', flexShrink: 0 }">{{ row[0] }}</div>
               <div class="md-body-medium" :class="{ mono: row[2] }" :style="{ flex: 1, wordBreak: 'break-all' }">{{ row[1] }}</div>
+            </div>
+          </div>
+
+          <div class="md-label-large txt-variant" :style="{ margin: '16px 0 8px' }">{{ t('peerNew.reviewOurs') }}</div>
+          <div :style="{ borderRadius: '16px', border: '1px solid var(--md-sys-color-outline-variant)', overflow: 'hidden' }">
+            <div
+              v-for="(row, i) in ourRows"
+              :key="row[0]"
+              class="row gap-4"
+              :style="{ padding: '14px 18px', borderBottom: i < ourRows.length - 1 ? '1px solid var(--md-sys-color-outline-variant)' : 'none', alignItems: 'center' }"
+            >
+              <div class="md-body-medium txt-variant" :style="{ width: '140px', flexShrink: 0 }">{{ row[0] }}</div>
+              <div class="md-body-medium mono" :style="{ flex: 1, wordBreak: 'break-all' }">{{ row[1] }}</div>
+              <MdCopyButton :value="row[1]" :size="28" />
             </div>
           </div>
 
@@ -269,19 +310,59 @@ const reviewRows = computed(() => [
             <MdButton variant="filled" icon="rocket_launch" :loading="submitting" @click="submit">{{ t('peerNew.createPeer') }}</MdButton>
           </div>
         </div>
+
+        <!-- Step 3: done — final ready-to-paste config (incl. generated PSK) -->
+        <div v-else-if="created">
+          <div class="col gap-3 text-center" :style="{ alignItems: 'center', padding: '8px 0 20px' }">
+            <span :style="{ display: 'inline-flex', width: '56px', height: '56px', borderRadius: '50%', alignItems: 'center', justifyContent: 'center', background: 'var(--md-sys-color-tertiary-container)', color: 'var(--md-sys-color-on-tertiary-container)' }">
+              <MdSym name="check" :size="30" />
+            </span>
+            <h3 class="md-title-large" :style="{ margin: 0 }">{{ t('peerNew.doneTitle') }}</h3>
+            <MdStatus :kind="statusMeta(created.status).kind">{{ statusMeta(created.status).label }}</MdStatus>
+            <p class="md-body-medium txt-variant" :style="{ margin: 0, maxWidth: '480px' }">
+              {{ created.status === 'active' ? t('peerNew.doneBodyActive') : t('peerNew.doneBodyPending') }}
+            </p>
+          </div>
+
+          <div :style="{ borderRadius: '16px', border: '1px solid var(--md-sys-color-outline-variant)', overflow: 'hidden' }">
+            <div class="row space-between" :style="{ padding: '14px 18px', background: 'var(--md-sys-color-surface-container-low)' }">
+              <div class="md-title-small row gap-2" :style="{ alignItems: 'center' }">
+                <MdSym name="terminal" :size="18" /> {{ t('peerNew.finalConfigTitle') }}
+              </div>
+            </div>
+            <div class="col gap-4" :style="{ padding: '18px' }">
+              <div class="col gap-2">
+                <div class="row space-between" :style="{ alignItems: 'center' }">
+                  <div class="md-label-large txt-variant">{{ t('peerNew.wgConfig') }}</div>
+                  <MdCopyButton :value="finalWgConfig" :size="30" />
+                </div>
+                <pre class="code-block" :style="{ margin: 0 }">{{ finalWgConfig }}</pre>
+              </div>
+              <div class="col gap-2">
+                <div class="row space-between" :style="{ alignItems: 'center' }">
+                  <div class="md-label-large txt-variant">{{ t('peerNew.birdConfig') }}</div>
+                  <MdCopyButton :value="birdConfigPreview" :size="30" />
+                </div>
+                <pre class="code-block" :style="{ margin: 0 }">{{ birdConfigPreview }}</pre>
+              </div>
+              <div class="md-body-small txt-variant">{{ t('peerNew.finalConfigNote') }}</div>
+            </div>
+          </div>
+
+          <div
+            v-if="created.wg_preshared_key"
+            class="md-body-small row gap-2"
+            :style="{ alignItems: 'flex-start', marginTop: '16px', padding: '14px', borderRadius: '12px', background: 'var(--md-sys-color-secondary-container)', color: 'var(--md-sys-color-on-secondary-container)' }"
+          >
+            <MdSym name="key" :size="18" fill /> <span>{{ t('peerNew.pskIncluded') }}</span>
+          </div>
+
+          <div class="row space-between" :style="{ marginTop: '24px' }">
+            <MdButton variant="text" icon="list" @click="navigateTo('/peers')">{{ t('peerNew.backToList') }}</MdButton>
+            <MdButton variant="filled" trailing-icon="arrow_forward" @click="navigateTo(`/peers/${created.id}`)">{{ t('peerNew.viewPeer') }}</MdButton>
+          </div>
+        </div>
       </div>
     </template>
-
-    <!-- PSK reveal dialog (one-time; the key is unrecoverable afterwards) -->
-    <MdDialog v-model:open="showCreated" :title="t('peerNew.createdTitle')">
-      <p>{{ t('peerNew.createdBody') }}</p>
-      <div class="code-block row space-between gap-3" :style="{ marginTop: '12px', alignItems: 'center', whiteSpace: 'normal', wordBreak: 'break-all' }">
-        <span :style="{ flex: 1 }">{{ createdPsk }}</span>
-        <MdCopyButton v-if="createdPsk" :value="createdPsk" :size="32" />
-      </div>
-      <template #actions>
-        <MdButton variant="filled" icon="check" @click="finishCreated">{{ t('common.confirm') }}</MdButton>
-      </template>
-    </MdDialog>
   </div>
 </template>

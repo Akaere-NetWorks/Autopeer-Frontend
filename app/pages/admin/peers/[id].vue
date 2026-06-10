@@ -79,39 +79,22 @@ type RoutedPoint = PeerMetricPoint & {
 const points = computed<RoutedPoint[]>(() => (metrics.value?.points ?? []) as RoutedPoint[])
 const hasSeries = computed(() => points.value.length > 1)
 
-function clipPeaks(series: number[], percentile = 95): number[] {
-  const valid = series.filter(v => Number.isFinite(v))
-  if (valid.length < 3) return series
-  const sorted = [...valid].sort((a, b) => a - b)
-  const idx = Math.min(Math.ceil(sorted.length * percentile / 100) - 1, sorted.length - 1)
-  const cap = sorted[idx]!
-  return series.map(v => Math.min(v, cap))
-}
-function maybeClip(series: number[]): number[] {
-  return peakOut.value ? clipPeaks(series) : series
-}
+// rx/tx are cumulative WireGuard counters; rate + transferred series are
+// derived from counter deltas in usePeerMetricSeries.
+const {
+  maybeClip,
+  rttSeries,
+  rxRateSeries,
+  txRateSeries,
+  peakRx,
+  peakTx,
+  transferredRx,
+  transferredTx,
+} = usePeerMetricSeries(points, peakOut)
 
-const rttSeries = computed(() => maybeClip(points.value.map(p => p.rtt_ms ?? 0)))
-const rxSeries = computed(() => maybeClip(points.value.map(p => p.rx_bytes)))
-const txSeries = computed(() => maybeClip(points.value.map(p => p.tx_bytes)))
-const totalRx = computed(() => points.value.reduce((a, p) => a + p.rx_bytes, 0))
-const totalTx = computed(() => points.value.reduce((a, p) => a + p.tx_bytes, 0))
-
-function computeRates(delta: (c: RoutedPoint, p: RoutedPoint) => number): number[] {
-  const pts = points.value
-  const out: number[] = []
-  for (let i = 1; i < pts.length; i++) {
-    const curr = pts[i]!
-    const prev = pts[i - 1]!
-    const dt = (new Date(curr.time).getTime() - new Date(prev.time).getTime()) / 1000
-    const d = delta(curr, prev)
-    out.push(dt > 0 && d >= 0 ? d / dt : 0)
-  }
-  return out
-}
-const rxRateSeries = computed(() => maybeClip(computeRates((c, p) => c.rx_bytes - p.rx_bytes)))
-const txRateSeries = computed(() => maybeClip(computeRates((c, p) => c.tx_bytes - p.tx_bytes)))
-const peakRate = computed(() => Math.max(0, ...rxRateSeries.value, ...txRateSeries.value))
+const fmtRate = (v: number) => `${fmtBytes(v)}/s`
+const fmtMs = (v: number) => `${v.toFixed(v >= 10 ? 0 : 1)} ${t('common.ms')}`
+const fmtCount = (v: number) => String(Math.round(v))
 
 // Route-count series + per-interval deltas for the route / route-rate charts.
 const routesImported = computed(() => maybeClip(points.value.map(p => p.routes_imported ?? 0)))
@@ -626,25 +609,28 @@ async function doDelete() {
               <div>
                 <div class="md-title-small" :style="{ marginBottom: '4px' }">{{ t('adminPeerDetail.chartRtt') }}</div>
                 <div class="md-body-small txt-variant" :style="{ marginBottom: '8px' }">{{ t('adminPeerDetail.rttCurrent', { rtt: fmtRtt(summary?.latest_rtt), range }) }}</div>
-                <MdAreaChart :data="rttSeries" color="primary" :height="150" label="RTT" />
+                <MdAreaChart :data="rttSeries" color="primary" :height="150" label="RTT" :format="fmtMs" />
               </div>
+              <!-- Per-second transfer-rate chart (derived from counter deltas) -->
               <div>
-                <div class="md-title-small" :style="{ marginBottom: '4px' }">{{ t('adminPeerDetail.chartTraffic') }}</div>
+                <div class="md-title-small" :style="{ marginBottom: '4px' }">{{ t('adminPeerDetail.chartRate') }}</div>
                 <div class="md-body-small txt-variant row gap-4" :style="{ marginBottom: '8px' }">
-                  <span class="row gap-2"><span :style="{ width: '14px', height: '3px', borderRadius: '2px', background: 'var(--md-sys-color-primary)', display: 'inline-block' }" /> {{ t('adminPeerDetail.rx') }} {{ fmtBytes(totalRx) }}</span>
-                  <span class="row gap-2"><span :style="{ width: '14px', height: '3px', borderRadius: '2px', backgroundImage: 'repeating-linear-gradient(90deg, var(--md-sys-color-tertiary) 0 3px, transparent 3px 6px)', display: 'inline-block' }" /> {{ t('adminPeerDetail.tx') }} {{ fmtBytes(totalTx) }}</span>
+                  <span class="row gap-2"><span :style="{ width: '14px', height: '3px', borderRadius: '2px', background: 'var(--md-sys-color-primary)', display: 'inline-block' }" /> {{ t('adminPeerDetail.rxPeak', { rate: fmtRate(peakRx) }) }}</span>
+                  <span class="row gap-2"><span :style="{ width: '14px', height: '3px', borderRadius: '2px', backgroundImage: 'repeating-linear-gradient(90deg, var(--md-sys-color-tertiary) 0 3px, transparent 3px 6px)', display: 'inline-block' }" /> {{ t('adminPeerDetail.txPeak', { rate: fmtRate(peakTx) }) }}</span>
                 </div>
-                <MdDualAreaChart :rx="rxSeries" :tx="txSeries" :height="150" />
+                <MdDualAreaChart :rx="rxRateSeries" :tx="txRateSeries" :height="150" :format="fmtRate" />
               </div>
             </div>
 
-            <div>
-              <div class="md-title-small" :style="{ marginBottom: '4px' }">{{ t('adminPeerDetail.chartRate') }}</div>
-              <div class="md-body-small txt-variant row gap-4" :style="{ marginBottom: '8px' }">
-                <span class="row gap-2"><span :style="{ width: '14px', height: '3px', borderRadius: '2px', background: 'var(--md-sys-color-primary)', display: 'inline-block' }" /> {{ t('adminPeerDetail.rxRate', { rate: fmtBytes(peakRate) }) }}</span>
-                <span class="row gap-2"><span :style="{ width: '14px', height: '3px', borderRadius: '2px', backgroundImage: 'repeating-linear-gradient(90deg, var(--md-sys-color-tertiary) 0 3px, transparent 3px 6px)', display: 'inline-block' }" /> {{ t('adminPeerDetail.txRate') }}</span>
-              </div>
-              <MdDualAreaChart :rx="rxRateSeries" :tx="txRateSeries" :height="150" />
+            <!-- Actual bytes transferred over the selected range -->
+            <div class="row gap-5 flex-wrap" :style="{ padding: '12px 16px', borderRadius: '12px', background: 'var(--md-sys-color-surface-container-low)', alignItems: 'center' }">
+              <span class="md-label-large txt-variant">{{ t('adminPeerDetail.transferred', { range }) }}</span>
+              <span class="row gap-2 md-body-medium mono" :style="{ alignItems: 'center' }">
+                <MdSym name="arrow_downward" :size="16" :style="{ color: 'var(--md-sys-color-primary)' }" /> {{ t('adminPeerDetail.rx') }} {{ fmtBytes(transferredRx) }}
+              </span>
+              <span class="row gap-2 md-body-medium mono" :style="{ alignItems: 'center' }">
+                <MdSym name="arrow_upward" :size="16" :style="{ color: 'var(--md-sys-color-tertiary)' }" /> {{ t('adminPeerDetail.tx') }} {{ fmtBytes(transferredTx) }}
+              </span>
             </div>
 
             <template v-if="hasRouteSeries">
@@ -655,9 +641,9 @@ async function doDelete() {
                   <span class="row gap-2"><span :style="{ width: '12px', height: '12px', borderRadius: '3px', background: 'var(--md-sys-color-tertiary)', display: 'inline-block' }" /> {{ t('adminPeerDetail.exported') }}</span>
                   <span class="row gap-2"><span :style="{ width: '12px', height: '12px', borderRadius: '3px', background: 'var(--md-sys-color-secondary)', display: 'inline-block' }" /> {{ t('adminPeerDetail.preferred') }}</span>
                 </div>
-                <MdAreaChart :data="routesImported" color="primary" :height="120" label="Routes imported" />
-                <MdAreaChart :data="routesExported" color="tertiary" :height="120" label="Routes exported" :style="{ marginTop: '6px' }" />
-                <MdAreaChart :data="routesPreferred" color="secondary" :height="120" label="Routes preferred" :style="{ marginTop: '6px' }" />
+                <MdAreaChart :data="routesImported" color="primary" :height="120" label="Routes imported" :format="fmtCount" />
+                <MdAreaChart :data="routesExported" color="tertiary" :height="120" label="Routes exported" :format="fmtCount" :style="{ marginTop: '6px' }" />
+                <MdAreaChart :data="routesPreferred" color="secondary" :height="120" label="Routes preferred" :format="fmtCount" :style="{ marginTop: '6px' }" />
               </div>
 
               <div v-if="routeDeltas.length > 1">

@@ -192,7 +192,11 @@ function startPolling() {
   pollTimer = setInterval(async () => {
     attempts++
     if (attempts > 100) { // ~5 minutes at 3s
+      // Don't leave the "waiting" spinner up forever: clear the pending link
+      // state and tell the user to start over.
       stopPolling()
+      tgDeeplink.value = ''
+      toast.show(t('notifications.telegram.linkTimeout'))
       return
     }
     try {

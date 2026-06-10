@@ -300,7 +300,7 @@ function openSchedule(id: string) {
                 </div>
 
                 <div v-if="taskPages > 1" class="row gap-2 space-between" :style="{ marginTop: '12px', alignItems: 'center' }">
-                  <span class="md-body-small txt-variant">{{ t('admin.queue.pageOf', { page: taskPage, pages: taskPages }) }}</span>
+                  <span class="md-body-small txt-variant">{{ t('admin.queue.pageOf', { page: taskPage, pages: taskPages, count: taskTotal }) }}</span>
                   <div class="row gap-1">
                     <MdIconButton icon="chevron_left" :disabled="taskPage <= 1" :title="t('common.back')" @click="taskPage--" />
                     <MdIconButton icon="chevron_right" :disabled="taskPage >= taskPages" :title="t('common.next')" @click="taskPage++" />

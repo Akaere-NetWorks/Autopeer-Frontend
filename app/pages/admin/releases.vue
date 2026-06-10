@@ -198,14 +198,16 @@ async function doDelete() {
           <span class="md-body-medium" :style="{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }">{{ file?.name || t('admin.releases.binary') }}</span>
           <span v-if="file" class="md-body-small txt-variant">{{ fmtBytes(file.size) }}</span>
         </button>
-        <MdTextField :label="t('admin.releases.version')" :model-value="form.version" mono :disabled="uploading" tf-bg="var(--md-sys-color-surface-container-high)" @update:model-value="(v: string) => (form.version = v)" />
+        <MdTextField :label="t('admin.releases.version')" :model-value="form.version" mono :disabled="uploading" :placeholder="t('admin.releases.versionPlaceholder')" tf-bg="var(--md-sys-color-surface-container-high)" @update:model-value="(v: string) => (form.version = v)" />
         <div class="row gap-3">
           <MdTextField :label="t('admin.releases.os')" :model-value="form.os" mono :disabled="uploading" tf-bg="var(--md-sys-color-surface-container-high)" @update:model-value="(v: string) => (form.os = v)" />
           <MdTextField :label="t('admin.releases.arch')" :model-value="form.arch" mono :disabled="uploading" tf-bg="var(--md-sys-color-surface-container-high)" @update:model-value="(v: string) => (form.arch = v)" />
         </div>
         <div v-if="uploading" class="col gap-2" aria-live="polite">
           <div class="row gap-2 md-body-small txt-variant" :style="{ justifyContent: 'space-between' }">
-            <span>{{ t('admin.releases.uploading') }}</span>
+            <!-- Bytes are fully sent at 100% but the server is still hashing/storing:
+                 say so instead of letting the bar look stalled. -->
+            <span>{{ uploadProgress >= 100 ? t('admin.releases.processing') : t('admin.releases.uploading') }}</span>
             <span class="mono">{{ uploadProgress }}%</span>
           </div>
           <div class="progress-track" role="progressbar" :aria-valuenow="uploadProgress" aria-valuemin="0" aria-valuemax="100">

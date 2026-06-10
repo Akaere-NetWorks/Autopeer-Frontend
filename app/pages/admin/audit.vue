@@ -71,7 +71,9 @@ function goToPage(p: number) {
 }
 
 function isPeer(action: string) { return action.includes('peer') }
-function pretty(action: string) { return action.replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) }
+
+// Localized labels shared with the user audit page (falls back to title-case).
+const { label: actionLabel } = useAuditActions()
 
 // One-line scalar summary kept from the original page; the full structured detail
 // (including nested objects) is reachable via the per-row Expand toggle below.
@@ -128,7 +130,12 @@ function detailJson(log: { detail?: Record<string, unknown> | null }) {
     <div v-if="data === null" class="col gap-3">
       <SkeletonBlock v-for="i in 6" :key="i" height="56px" radius="12px" />
     </div>
-    <div v-else-if="!logs.length" class="card card-outlined card-pad text-center txt-variant">{{ t('admin.audit.empty') }}</div>
+    <!-- Distinguish "no results for these filters" (offer to clear) from a
+         genuinely empty log. -->
+    <EmptyState v-else-if="!logs.length && hasActiveFilter" icon="filter_alt_off" :body="t('admin.audit.emptyFiltered')">
+      <MdButton variant="tonal" icon="filter_alt_off" @click="clearFilters">{{ t('admin.audit.clearFilters') }}</MdButton>
+    </EmptyState>
+    <EmptyState v-else-if="!logs.length" icon="receipt_long" :body="t('admin.audit.empty')" />
 
     <template v-else>
       <div class="card card-elevated">
@@ -146,8 +153,9 @@ function detailJson(log: { detail?: Record<string, unknown> | null }) {
               <MdSym :name="isPeer(log.action) ? 'hub' : 'shield_person'" :size="20" fill />
             </span>
             <div :style="{ flex: 1, minWidth: 0 }">
-              <div class="md-title-small">
-                {{ pretty(log.action) }}
+              <div class="md-title-small row gap-2" :style="{ flexWrap: 'wrap', alignItems: 'center', rowGap: '4px' }">
+                <span>{{ actionLabel(log.action) }}</span>
+                <code class="md-body-small mono txt-variant" :style="{ background: 'var(--md-sys-color-surface-container-highest)', padding: '1px 6px', borderRadius: '6px' }">{{ log.action }}</code>
                 <span class="md-body-small txt-variant mono">· {{ log.operator }}</span>
               </div>
               <div v-if="detailSummary(log)" class="md-body-small mono txt-variant" :style="{ wordBreak: 'break-word' }">{{ detailSummary(log) }}</div>

@@ -58,35 +58,8 @@ function isPeer(action: string) {
   return action.includes('peer')
 }
 
-// Localized human label for known action codes (StatusTag-style), falling back to
-// a generic "audit event" string for anything unmapped.
-const ACTION_LABELS: Record<string, string> = {
-  'user.login': 'userAudit.actionLogin',
-  'user.login_gpg': 'userAudit.actionLoginGpg',
-  'admin.login_as': 'userAudit.actionAdminLoginAs',
-  'peer.create': 'userAudit.actionPeerCreate',
-  'peer.approve': 'userAudit.actionPeerApprove',
-  'peer.approve.diverged': 'userAudit.actionPeerApproveDiverged',
-  'peer.reject': 'userAudit.actionPeerReject',
-  'peer.suspend': 'userAudit.actionPeerSuspend',
-  'peer.unsuspend': 'userAudit.actionPeerUnsuspend',
-  'peer.update': 'userAudit.actionPeerUpdate',
-  'peer.user_update': 'userAudit.actionPeerUpdate',
-  'peer.email_updated': 'userAudit.actionEmailUpdate',
-  'peer.delete': 'userAudit.actionPeerDelete',
-  'peer.admin_delete': 'userAudit.actionPeerAdminDelete',
-  'peer.import_peer': 'userAudit.actionPeerImport',
-}
-function actionLabel(action: string) {
-  const key = ACTION_LABELS[action]
-  return key ? t(key) : t('userAudit.actionUnknown')
-}
-function actionKind(action: string): 'success' | 'warning' | 'error' | 'info' | 'neutral' {
-  if (action.includes('delete') || action.includes('reject') || action.includes('suspend')) return 'error'
-  if (action.includes('approve') || action.includes('create') || action.includes('unsuspend')) return 'success'
-  if (action.includes('login')) return 'info'
-  return 'neutral'
-}
+// Localized labels / tones shared with the admin audit page.
+const { label: actionLabel, kind: actionKind } = useAuditActions()
 
 function detailValue(detail: AuditLog['detail'], key: string): string {
   const value = detail?.[key]
@@ -124,7 +97,12 @@ function actionDescription(log: AuditLog) {
       <SkeletonBlock v-for="i in 6" :key="i" height="64px" radius="12px" />
     </div>
 
-    <div v-else-if="!logs.length" class="card card-outlined card-pad text-center txt-variant">{{ t('audit.empty') }}</div>
+    <!-- Distinguish "no results for this filter" (offer to clear) from a
+         genuinely empty log. -->
+    <EmptyState v-else-if="!logs.length && actionFilter" icon="filter_alt_off" :body="t('audit.emptyFiltered')">
+      <MdButton variant="tonal" icon="filter_alt_off" @click="clearFilter">{{ t('audit.clearFilters') }}</MdButton>
+    </EmptyState>
+    <EmptyState v-else-if="!logs.length" icon="receipt_long" :body="t('audit.empty')" />
 
     <template v-else>
       <div class="card card-elevated">

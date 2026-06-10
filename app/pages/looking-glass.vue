@@ -108,6 +108,13 @@ const rawText = computed(() => {
 
 async function run() {
   if (!canRun.value || running.value) return
+  // MdSelect can't disable individual options, so an offline node can be
+  // selected — fail fast with a clear message instead of a backend round-trip.
+  const selected = allNodes.value.find(n => n.id === nodeId.value)
+  if (selected && !selected.online) {
+    error.value = t('lookingGlass.nodeOffline')
+    return
+  }
   running.value = true
   error.value = ''
   result.value = null
@@ -134,9 +141,7 @@ async function run() {
     <PageHeader icon="travel_explore" :title="t('lookingGlass.title')" :subtitle="t('lookingGlass.subtitle')" />
 
     <div class="card card-elevated card-pad">
-      <div v-if="!nodesPending && !allNodes.length" class="md-body-medium txt-variant">
-        {{ t('lookingGlass.noNodes') }}
-      </div>
+      <EmptyState v-if="!nodesPending && !allNodes.length" bare icon="dns" :body="t('lookingGlass.noNodes')" />
       <template v-else>
         <div class="params-2" :style="{ marginBottom: '18px' }">
           <MdSelect

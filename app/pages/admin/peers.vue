@@ -254,13 +254,15 @@ onMounted(refreshAll)
       </template>
     </PageHeader>
 
-    <!-- Import result summary -->
+    <!-- Import result summary: warning tone when some rows failed, success otherwise -->
     <div
       v-if="importResult"
       class="row gap-3"
-      :style="{ alignItems: 'flex-start', padding: '16px', borderRadius: '16px', background: 'var(--md-sys-color-success-container)', color: 'var(--md-sys-color-on-success-container)' }"
+      :style="importResult.errors.length
+        ? { alignItems: 'flex-start', padding: '16px', borderRadius: '16px', background: 'var(--md-sys-color-warning-container)', color: 'var(--md-sys-color-on-warning-container)' }
+        : { alignItems: 'flex-start', padding: '16px', borderRadius: '16px', background: 'var(--md-sys-color-success-container)', color: 'var(--md-sys-color-on-success-container)' }"
     >
-      <MdSym name="check_circle" :size="22" fill :style="{ flexShrink: 0 }" />
+      <MdSym :name="importResult.errors.length ? 'warning' : 'check_circle'" :size="22" fill :style="{ flexShrink: 0 }" />
       <div :style="{ flex: 1, minWidth: 0 }">
         <div class="md-body-medium">{{ t('admin.peers.importResult', { imported: importResult.imported, overwritten: importResult.overwritten, skipped: importResult.skipped, total: importResult.total }) }}</div>
         <ul v-if="importResult.errors.length" class="md-body-small" :style="{ margin: '6px 0 0', paddingLeft: '18px' }">
@@ -360,13 +362,21 @@ onMounted(refreshAll)
     </MdDialog>
 
     <!-- Delete -->
-    <MdDialog :open="!!deleteFor" :title="t('admin.peers.deleteTitle')" :submitting="submitting" @update:open="deleteFor = null">
-      <p :style="{ margin: 0 }">{{ t('admin.peers.deleteBody') }}</p>
-      <template #actions="{ close }">
-        <MdButton variant="text" :disabled="submitting" @click="close">{{ t('common.cancel') }}</MdButton>
-        <MdButton variant="filled" :loading="submitting" :style="{ background: 'var(--md-sys-color-error)', color: 'var(--md-sys-color-on-error)' }" @click="doDelete">{{ t('common.delete') }}</MdButton>
-      </template>
-    </MdDialog>
+    <ConfirmDialog
+      :open="!!deleteFor"
+      :title="t('admin.peers.deleteTitle')"
+      :warning="t('admin.peers.deleteBody')"
+      :recap="deleteFor ? [
+        [t('admin.peers.asn'), `AS${deleteFor.remote_asn}`],
+        [t('admin.peers.node'), deleteFor.node_name],
+        [t('admin.peers.endpoint'), deleteFor.remote_endpoint],
+      ] : []"
+      :confirm-label="t('common.delete')"
+      confirm-icon="delete"
+      :submitting="submitting"
+      @update:open="deleteFor = null"
+      @confirm="doDelete"
+    />
 
     <!-- Edit -->
     <MdDialog :open="!!editFor" :title="t('admin.peers.editTitle')" :submitting="submitting" @update:open="editFor = null">

@@ -67,6 +67,12 @@ async function act<T>(id: string, fn: () => Promise<T>, after?: (r: T) => void) 
 }
 
 // ── Create ────────────────────────────────────────────────────────────────────
+// Fresh form on every open, so values typed before a cancel don't resurface.
+// (On submit FAILURE the dialog stays open with the values preserved.)
+function openCreate() {
+  Object.assign(form, { name: '', location: '', public_ip: '', our_lla: '', our_wg_pubkey: '', our_asn: '' })
+  showCreate.value = true
+}
 const createValid = computed(() =>
   !!form.name && !!form.location && !!form.public_ip && !!form.our_lla && !!form.our_wg_pubkey,
 )
@@ -250,7 +256,7 @@ function goDetail(n: AdminNode) {
   <div v-else class="col gap-5">
     <PageHeader icon="dns" :title="t('admin.nodes.title')" :subtitle="t('admin.nodes.subtitle')">
       <template #action>
-        <MdButton variant="filled" icon="add" @click="showCreate = true">{{ t('admin.nodes.create') }}</MdButton>
+        <MdButton variant="filled" icon="add" @click="openCreate">{{ t('admin.nodes.create') }}</MdButton>
       </template>
     </PageHeader>
 

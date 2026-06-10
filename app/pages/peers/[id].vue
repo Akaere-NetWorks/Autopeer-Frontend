@@ -174,57 +174,25 @@ const nodeRows = computed(() => {
 })
 
 // ── Charts ────────────────────────────────────────────────────────────────────
+// rx/tx are cumulative WireGuard counters; rate + transferred series are
+// derived from counter deltas in usePeerMetricSeries.
 const peakOut = ref(false)
-
-function clipPeaks(data: number[], percentile = 95): number[] {
-  const valid = data.filter((v) => Number.isFinite(v))
-  if (valid.length < 3) return data
-  const sorted = [...valid].sort((a, b) => a - b)
-  const idx = Math.min(Math.ceil(sorted.length * percentile / 100) - 1, sorted.length - 1)
-  const cap = sorted[idx]!
-  return data.map((v) => Math.min(v, cap))
-}
 
 const points = computed<PeerMetricPoint[]>(() => metrics.value?.points ?? [])
 const hasSeries = computed(() => points.value.length > 1)
 
-const rttSeries = computed(() => {
-  const raw = points.value.map((p) => p.rtt_ms ?? 0)
-  return peakOut.value ? clipPeaks(raw) : raw
-})
-const rxSeries = computed(() => {
-  const raw = points.value.map((p) => p.rx_bytes)
-  return peakOut.value ? clipPeaks(raw) : raw
-})
-const txSeries = computed(() => {
-  const raw = points.value.map((p) => p.tx_bytes)
-  return peakOut.value ? clipPeaks(raw) : raw
-})
-const totalRx = computed(() => points.value.reduce((a, p) => a + p.rx_bytes, 0))
-const totalTx = computed(() => points.value.reduce((a, p) => a + p.tx_bytes, 0))
+const {
+  rttSeries,
+  rxRateSeries,
+  txRateSeries,
+  peakRx,
+  peakTx,
+  transferredRx,
+  transferredTx,
+} = usePeerMetricSeries(points, peakOut)
 
-// Per-second rate chart derived from consecutive byte deltas.
-const rxRateSeries = computed(() => {
-  const raw = computeRates((c, p) => c.rx_bytes - p.rx_bytes)
-  return peakOut.value ? clipPeaks(raw) : raw
-})
-const txRateSeries = computed(() => {
-  const raw = computeRates((c, p) => c.tx_bytes - p.tx_bytes)
-  return peakOut.value ? clipPeaks(raw) : raw
-})
-function computeRates(delta: (c: PeerMetricPoint, p: PeerMetricPoint) => number): number[] {
-  const pts = points.value
-  const out: number[] = []
-  for (let i = 1; i < pts.length; i++) {
-    const curr = pts[i]!
-    const prev = pts[i - 1]!
-    const dt = (new Date(curr.time).getTime() - new Date(prev.time).getTime()) / 1000
-    const d = delta(curr, prev)
-    out.push(dt > 0 && d >= 0 ? d / dt : 0)
-  }
-  return out
-}
-const peakRate = computed(() => Math.max(0, ...rxRateSeries.value, ...txRateSeries.value))
+const fmtRate = (v: number) => `${fmtBytes(v)}/s`
+const fmtMs = (v: number) => `${v.toFixed(v >= 10 ? 0 : 1)} ${t('common.ms')}`
 
 // ── Edit ─────────────────────────────────────────────────────────────────────
 const showEdit = ref(false)
@@ -430,26 +398,28 @@ async function confirmDelete() {
             <div>
               <div class="md-title-small" :style="{ marginBottom: '4px' }">{{ t('peerDetail.metrics.rtt') }}</div>
               <div class="md-body-small txt-variant" :style="{ marginBottom: '8px' }">{{ t('peerDetail.rangeNote', { rtt: fmtRtt(metrics?.latest_rtt), range }) }}</div>
-              <MdAreaChart :data="rttSeries" color="primary" :height="150" label="RTT" />
+              <MdAreaChart :data="rttSeries" color="primary" :height="150" label="RTT" :format="fmtMs" />
             </div>
+            <!-- Per-second transfer-rate chart (derived from counter deltas) -->
             <div>
-              <div class="md-title-small" :style="{ marginBottom: '4px' }">{{ t('peerDetail.traffic') }}</div>
+              <div class="md-title-small" :style="{ marginBottom: '4px' }">{{ t('peerDetail.transferRate') }}</div>
               <div class="md-body-small txt-variant row gap-4" :style="{ marginBottom: '8px' }">
-                <span class="row gap-2"><span :style="{ width: '14px', height: '3px', borderRadius: '2px', background: 'var(--md-sys-color-primary)', display: 'inline-block' }" /> {{ t('peerDetail.rx') }} {{ fmtBytes(totalRx) }}</span>
-                <span class="row gap-2"><span :style="{ width: '14px', height: '3px', borderRadius: '2px', backgroundImage: 'repeating-linear-gradient(90deg, var(--md-sys-color-tertiary) 0 3px, transparent 3px 6px)', display: 'inline-block' }" /> {{ t('peerDetail.tx') }} {{ fmtBytes(totalTx) }}</span>
+                <span class="row gap-2"><span :style="{ width: '14px', height: '3px', borderRadius: '2px', background: 'var(--md-sys-color-primary)', display: 'inline-block' }" /> {{ t('peerDetail.rxPeak', { rate: fmtRate(peakRx) }) }}</span>
+                <span class="row gap-2"><span :style="{ width: '14px', height: '3px', borderRadius: '2px', backgroundImage: 'repeating-linear-gradient(90deg, var(--md-sys-color-tertiary) 0 3px, transparent 3px 6px)', display: 'inline-block' }" /> {{ t('peerDetail.txPeak', { rate: fmtRate(peakTx) }) }}</span>
               </div>
-              <MdDualAreaChart :rx="rxSeries" :tx="txSeries" :height="150" />
+              <MdDualAreaChart :rx="rxRateSeries" :tx="txRateSeries" :height="150" :format="fmtRate" />
             </div>
           </div>
 
-          <!-- Per-second transfer-rate chart (derived from byte deltas) -->
-          <div>
-            <div class="md-title-small" :style="{ marginBottom: '4px' }">{{ t('peerDetail.transferRate') }}</div>
-            <div class="md-body-small txt-variant row gap-4" :style="{ marginBottom: '8px' }">
-              <span class="row gap-2"><span :style="{ width: '14px', height: '3px', borderRadius: '2px', background: 'var(--md-sys-color-primary)', display: 'inline-block' }" /> {{ t('peerDetail.rxRate', { rate: fmtBytes(peakRate) }) }}</span>
-              <span class="row gap-2"><span :style="{ width: '14px', height: '3px', borderRadius: '2px', backgroundImage: 'repeating-linear-gradient(90deg, var(--md-sys-color-tertiary) 0 3px, transparent 3px 6px)', display: 'inline-block' }" /> {{ t('peerDetail.txRate') }}</span>
-            </div>
-            <MdDualAreaChart :rx="rxRateSeries" :tx="txRateSeries" :height="150" />
+          <!-- Actual bytes transferred over the selected range -->
+          <div class="row gap-5 flex-wrap" :style="{ padding: '12px 16px', borderRadius: '12px', background: 'var(--md-sys-color-surface-container-low)', alignItems: 'center' }">
+            <span class="md-label-large txt-variant">{{ t('peerDetail.transferred', { range }) }}</span>
+            <span class="row gap-2 md-body-medium mono" :style="{ alignItems: 'center' }">
+              <MdSym name="arrow_downward" :size="16" :style="{ color: 'var(--md-sys-color-primary)' }" /> {{ t('peerDetail.rx') }} {{ fmtBytes(transferredRx) }}
+            </span>
+            <span class="row gap-2 md-body-medium mono" :style="{ alignItems: 'center' }">
+              <MdSym name="arrow_upward" :size="16" :style="{ color: 'var(--md-sys-color-tertiary)' }" /> {{ t('peerDetail.tx') }} {{ fmtBytes(transferredTx) }}
+            </span>
           </div>
         </div>
       </div>

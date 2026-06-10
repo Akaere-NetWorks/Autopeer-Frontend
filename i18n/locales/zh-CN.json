@@ -41,7 +41,8 @@
     "backToPeers": "返回我的对等",
     "ms": "ms",
     "dash": "—",
-    "status": "状态"
+    "status": "状态",
+    "typeToConfirm": "输入 {word} 以确认"
   },
   "theme": {
     "toggle": "切换主题",
@@ -113,7 +114,8 @@
       "system": "系统",
       "queue": "队列"
     },
-    "assistant": "AI 助手"
+    "assistant": "AI 助手",
+    "adminRole": "管理员"
   },
   "footer": {
     "dn42": "DN42",
@@ -133,7 +135,7 @@
       "nodesOnlineSub": "共 {total} 个",
       "activePeers": "活跃对等",
       "activePeersSub": "跨所有节点",
-      "traffic": "流量 · 24h",
+      "traffic": "流量 · 24h(↓+↑)",
       "trafficSub": "{rx} ↓ / {tx} ↑",
       "avgRtt": "平均 RTT",
       "avgRttSub": "平均往返时间"
@@ -179,7 +181,7 @@
     "subtitlePasskey": "为 AS{asn} 使用您已注册的通行密钥。",
     "asnLabel": "您的 ASN",
     "asnPlaceholder": "例如 4242421234",
-    "asnSupporting": "您的 DN42 自治系统号。",
+    "asnSupporting": "您的 DN42 自治系统号(至少 4 位数字)。",
     "method": "验证方式",
     "methods": {
       "email": "邮箱验证码",
@@ -285,7 +287,8 @@
     "view": {
       "cards": "卡片",
       "table": "表格"
-    }
+    },
+    "clearFilter": "清除筛选"
   },
   "peerNew": {
     "title": "创建新对等",
@@ -295,7 +298,8 @@
     "steps": {
       "selectNode": "选择节点",
       "configure": "配置",
-      "review": "检查"
+      "review": "检查",
+      "done": "完成"
     },
     "selectNodeTitle": "选择一个节点",
     "configTitle": "对等配置",
@@ -327,7 +331,6 @@
     "pskEnabled": "已启用（创建时生成）",
     "pskDisabled": "已禁用",
     "createdTitle": "对等已创建",
-    "createdBody": "您的对等已提交。请立即保存预共享密钥 — 它将不会再次显示。",
     "validation": {
       "pubkey": "必须是至少 40 个字符的 base64 WireGuard 密钥。",
       "endpoint": "必须为 host:port 或 [IPv6]:port。",
@@ -341,7 +344,25 @@
     "noNodes": "暂无可用节点。",
     "pskAfterCreate": "创建后展示",
     "wgConfig": "WireGuard 配置",
-    "yourPrivateKey": "你的私钥"
+    "yourPrivateKey": "你的私钥",
+    "ourInfoTitle": "我方参数",
+    "ourInfoBody": "请使用以下参数配置你这一侧的 WireGuard 与 BGP。",
+    "our": {
+      "asn": "我方 ASN",
+      "endpoint": "我方端点",
+      "pubkey": "我方公钥",
+      "lla": "我方链路本地地址"
+    },
+    "reviewYours": "你提供的信息",
+    "reviewOurs": "我方信息",
+    "doneTitle": "对等请求已创建",
+    "doneBodyPending": "请求正在等待审核,审核通过后系统将自动部署,通常几分钟内生效。",
+    "doneBodyActive": "请求已通过,系统正在自动部署,隧道将在几分钟内建立。",
+    "finalConfigTitle": "你的配置",
+    "finalConfigNote": "请将以上配置粘贴到你这一侧。这些参数之后也可以在 Peer 详情页查看。",
+    "pskIncluded": "生成的预共享密钥已包含在上方配置中,之后也可在 Peer 详情页查看。",
+    "viewPeer": "查看 Peer",
+    "backToList": "我的对等"
   },
   "peerDetail": {
     "statusGuidance": "状态说明",
@@ -362,10 +383,9 @@
       "lastHandshake": "上次握手"
     },
     "runtimeMetrics": "运行指标",
-    "traffic": "流量",
     "rx": "接收",
     "tx": "发送",
-    "rangeNote": "平均 {rtt} ms · 范围 {range}",
+    "rangeNote": "最新 {rtt} ms · 范围 {range}",
     "connParams": "连接参数",
     "connParamsSub": "建立隧道所需的对端信息。",
     "nodeConfig": "节点配置",
@@ -414,10 +434,11 @@
     "noBgpState": "暂无",
     "noMetricsYet": "暂无指标。对等开始上报后将显示数据。",
     "peakOut": "峰值剔除",
-    "rxRate": "接收速率（峰值 {rate}）",
     "statusSummary": "当前对等状态：{status}。BGP 状态：{bgp}。",
     "transferRate": "传输速率",
-    "txRate": "发送速率"
+    "rxPeak": "接收 · 峰值 {rate}",
+    "txPeak": "发送 · 峰值 {rate}",
+    "transferred": "本时段传输量 · {range}"
   },
   "lookingGlass": {
     "title": "Looking Glass",
@@ -446,7 +467,8 @@
     "noRoutes": "未找到路由。",
     "offline": "离线",
     "packets": "数据包",
-    "rttMs": "RTT"
+    "rttMs": "RTT",
+    "nodeOffline": "所选节点处于离线状态,请选择在线节点后重试。"
   },
   "security": {
     "title": "安全会话",
@@ -508,7 +530,8 @@
       "openLink": "在 Telegram 中打开",
       "linkHint": "请在 10 分钟内在 Telegram 中打开此链接以完成关联。",
       "prefsTitle": "Telegram 通知",
-      "waiting": "正在等待您在 Telegram 中完成关联…"
+      "waiting": "正在等待您在 Telegram 中完成关联…",
+      "linkTimeout": "绑定等待超时,请重新点击绑定。"
     },
     "labels": {
       "critical": "关键",
@@ -533,7 +556,8 @@
     "collapse": "收起",
     "expand": "展开",
     "target": "目标",
-    "totalCount": "共 {count} 条记录"
+    "totalCount": "共 {count} 条记录",
+    "emptyFiltered": "没有匹配该筛选条件的审计记录。"
   },
   "mcpKeys": {
     "title": "MCP API 密钥",
@@ -610,7 +634,9 @@
     "page404Body": "你访问的页面不存在或已移动。",
     "page500Title": "出错了",
     "page500Body": "发生了意外错误，请重试。",
-    "backHome": "返回首页"
+    "backHome": "返回首页",
+    "pageUnavailableTitle": "服务暂不可用",
+    "pageUnavailableBody": "服务器暂时无法访问,可能正在重启或维护中,请稍后重试。"
   },
   "admin": {
     "overview": {
@@ -695,7 +721,7 @@
       "importOverwrite": "覆盖已存在的对等（否则跳过）",
       "importResult": "共 {total} 个对等：导入 {imported} 个，覆盖 {overwritten} 个，跳过 {skipped} 个。",
       "importTitle": "导入对等",
-      "searchPlaceholder": "搜索 ASN、节点或端点"
+      "searchPlaceholder": "在当前页内筛选 ASN、节点或端点"
     },
     "nodes": {
       "title": "节点管理",
@@ -798,7 +824,9 @@
       "uploading": "上传中…",
       "uploadFailed": "上传失败",
       "duplicate": "该 OS/架构下此版本已存在，请先删除后再重新上传。",
-      "tooLarge": "二进制文件超过 100 MB 上限。"
+      "tooLarge": "二进制文件超过 100 MB 上限。",
+      "versionPlaceholder": "v1.2.3",
+      "processing": "服务器处理中…"
     },
     "bot": {
       "title": "Telegram 机器人",
@@ -828,7 +856,9 @@
       "blocked": "用户已封禁",
       "unblocked": "用户已解封",
       "noCommands": "暂无命令记录。",
-      "noBlocked": "暂无封禁用户。"
+      "noBlocked": "暂无封禁用户。",
+      "resetTokenTitle": "重置 Bot Token?",
+      "resetTokenWarning": "当前 Token 将立即失效,在配置新 Token 之前 Bot 将保持断开。"
     },
     "settings": {
       "title": "站点设置",
@@ -860,7 +890,8 @@
       "clearFilters": "清除",
       "expand": "显示详情",
       "collapse": "隐藏详情",
-      "entries": "{count} 条记录"
+      "entries": "{count} 条记录",
+      "emptyFiltered": "没有匹配这些筛选条件的审计记录。"
     },
     "devices": {
       "title": "管理会话",
@@ -1071,7 +1102,7 @@
       "enqueuedAt": "入队时间",
       "noEvents": "暂无入队事件。",
       "page": "第 {page} 页",
-      "pageOf": "第 {page} / {pages} 页",
+      "pageOf": "第 {page} / {pages} 页 · 共 {count} 条",
       "deleteTaskTitle": "删除任务？",
       "confirmDeleteTask": "该任务将从队列中永久删除，此操作无法撤销。",
       "cancelTitle": "取消活跃任务？",
@@ -1164,12 +1195,9 @@
     "noMetrics": "该时间范围内暂无指标记录。",
     "chartRtt": "往返时延",
     "rttCurrent": "最新 {rtt} 毫秒 · 范围 {range}",
-    "chartTraffic": "流量",
     "rx": "接收",
     "tx": "发送",
     "chartRate": "传输速率",
-    "rxRate": "接收速率 · 峰值 {rate}/秒",
-    "txRate": "发送速率",
     "chartRoutes": "路由",
     "imported": "导入",
     "exported": "导出",
@@ -1184,7 +1212,10 @@
     "contactRetry": "重试验证",
     "contactSaved": "联系邮箱已更新",
     "deleteConfirmLabel": "输入 \"delete\" 以确认",
-    "deleteConfirmPlaceholder": "delete"
+    "deleteConfirmPlaceholder": "delete",
+    "rxPeak": "接收 · 峰值 {rate}",
+    "txPeak": "发送 · 峰值 {rate}",
+    "transferred": "本时段传输量 · {range}"
   },
   "assistant": {
     "clear": "清除",
@@ -1206,7 +1237,6 @@
   "userAudit": {
     "accountRelated": "账户级事件",
     "actionPlaceholder": "例如 peer.approve",
-    "actionUnknown": "审计事件",
     "asnRelated": "相关 ASN：AS{asn}",
     "peerRelated": "对等相关事件"
   }

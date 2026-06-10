@@ -61,7 +61,7 @@ async function onSignOut() {
       <div :style="{ flex: 1, minWidth: 0 }">
         <div class="md-title-small mono">AS{{ asn }}</div>
         <div class="md-body-small" :style="{ color: 'var(--md-sys-color-on-surface-variant)' }">
-          {{ user?.role === 'admin' ? 'Admin' : t('nav.user') }}
+          {{ user?.role === 'admin' ? t('nav.adminRole') : t('nav.user') }}
         </div>
       </div>
       <MdIconButton icon="logout" :title="t('common.signOut')" @click="onSignOut" />

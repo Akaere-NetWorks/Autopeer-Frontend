@@ -75,7 +75,7 @@ async function doLoginAs() {
       :style="{ alignItems: 'flex-start', padding: '12px 16px', borderRadius: '12px', background: 'var(--md-sys-color-error-container)', color: 'var(--md-sys-color-on-error-container)' }"
     >
       <MdSym name="error" :size="20" />
-      <span class="md-body-medium">{{ error.message || t('common.retry') }}</span>
+      <span class="md-body-medium">{{ error.message || t('errors.network') }}</span>
     </div>
 
     <div v-if="data === null" class="col gap-3">
@@ -106,7 +106,7 @@ async function doLoginAs() {
             {{ t('admin.devices.created') }} {{ fmtDate(s.created_at) }} · {{ t('admin.devices.expires') }} {{ fmtDate(s.expires_at) }}
           </div>
         </div>
-        <span class="md-body-small txt-variant" :style="{ whiteSpace: 'nowrap', marginRight: '8px' }">{{ relTime(s.last_used_at || s.created_at) }}</span>
+        <span class="md-body-small txt-variant" :style="{ whiteSpace: 'nowrap', marginRight: '8px' }">{{ s.last_used_at ? relTime(s.last_used_at) : t('common.never') }}</span>
         <MdIconButton icon="logout" :title="t('admin.devices.revoke')" :loading="busy === s.id" @click="revoke(s)" />
       </div>
     </div>

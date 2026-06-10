@@ -143,7 +143,7 @@ async function doRemovePasskey() {
           <div :style="{ flex: 1, minWidth: 0 }">
             <div class="md-title-small">{{ s.device_name || s.user_agent || 'Session' }}</div>
             <div class="md-body-small mono txt-variant">
-              {{ s.ip_address || '—' }} · {{ t('security.lastUsed', { time: relTime(s.last_used_at || s.created_at) }) }} · {{ t('security.expires', { time: relTime(s.expires_at) }) }}
+              {{ s.ip_address || '—' }} · {{ t('security.lastUsed', { time: s.last_used_at ? relTime(s.last_used_at) : t('common.never') }) }} · {{ t('security.expires', { time: relTime(s.expires_at) }) }}
             </div>
           </div>
           <MdIconButton icon="delete" :title="t('security.revoke')" @click="askRevoke(s.id)" />

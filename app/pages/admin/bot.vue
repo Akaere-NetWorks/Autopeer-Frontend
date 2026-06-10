@@ -39,10 +39,21 @@ async function saveSetting(key: string) {
   catch (e) { toast.error(e) } finally { saving.value = null }
 }
 
+// Token reset invalidates the current token immediately — gate it behind an
+// explicit confirmation before calling the API.
+const showResetConfirm = ref(false)
+const resetting = ref(false)
 const tokenDialog = ref<string | null>(null)
 async function resetToken() {
-  try { const r = await api.admin.bot.resetToken(); tokenDialog.value = r.new_token; await refresh() }
+  resetting.value = true
+  try {
+    const r = await api.admin.bot.resetToken()
+    showResetConfirm.value = false
+    tokenDialog.value = r.new_token
+    await refresh()
+  }
   catch (e) { toast.error(e) }
+  finally { resetting.value = false }
 }
 
 const showBlock = ref(false)
@@ -87,7 +98,7 @@ async function copy(text: string) {
       <section class="col gap-3">
         <div class="row space-between" :style="{ alignItems: 'center' }">
           <h2 class="md-title-large" :style="{ margin: 0 }">{{ t('admin.bot.settings') }}</h2>
-          <MdButton variant="text" icon="key" @click="resetToken">{{ t('admin.bot.resetToken') }}</MdButton>
+          <MdButton variant="text" icon="key" @click="showResetConfirm = true">{{ t('admin.bot.resetToken') }}</MdButton>
         </div>
         <div class="card card-elevated">
           <div v-for="(s, i) in settings" :key="s.key" class="list-item" :style="{ borderBottom: i < settings.length - 1 ? '1px solid var(--md-sys-color-outline-variant)' : 'none', padding: '16px 20px', flexWrap: 'wrap' }">
@@ -155,6 +166,17 @@ async function copy(text: string) {
         <MdButton variant="filled" :disabled="!blockForm.tg_user_id" @click="doBlock">{{ t('admin.bot.block') }}</MdButton>
       </template>
     </MdDialog>
+
+    <!-- Token reset confirmation -->
+    <ConfirmDialog
+      v-model:open="showResetConfirm"
+      :title="t('admin.bot.resetTokenTitle')"
+      :warning="t('admin.bot.resetTokenWarning')"
+      :confirm-label="t('admin.bot.resetToken')"
+      confirm-icon="key"
+      :submitting="resetting"
+      @confirm="resetToken"
+    />
 
     <!-- Token reveal -->
     <MdDialog :open="!!tokenDialog" :title="t('admin.bot.tokenTitle')" @update:open="tokenDialog = null">

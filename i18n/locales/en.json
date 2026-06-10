@@ -41,7 +41,8 @@
     "backToPeers": "Back to My Peers",
     "ms": "ms",
     "dash": "—",
-    "status": "Status"
+    "status": "Status",
+    "typeToConfirm": "Type {word} to confirm"
   },
   "theme": {
     "toggle": "Toggle theme",
@@ -113,7 +114,8 @@
       "system": "System",
       "queue": "Queue"
     },
-    "assistant": "AI Assistant"
+    "assistant": "AI Assistant",
+    "adminRole": "Admin"
   },
   "footer": {
     "dn42": "DN42",
@@ -133,7 +135,7 @@
       "nodesOnlineSub": "out of {total} total",
       "activePeers": "Active Peers",
       "activePeersSub": "across all nodes",
-      "traffic": "Traffic · 24h",
+      "traffic": "Traffic · 24h (↓+↑)",
       "trafficSub": "{rx} ↓ / {tx} ↑",
       "avgRtt": "Avg RTT",
       "avgRttSub": "average round-trip time"
@@ -179,7 +181,7 @@
     "subtitlePasskey": "Use your registered passkey for AS{asn}.",
     "asnLabel": "Your ASN",
     "asnPlaceholder": "e.g. 4242421234",
-    "asnSupporting": "Your DN42 autonomous system number.",
+    "asnSupporting": "Your DN42 autonomous system number (at least 4 digits).",
     "method": "Verification method",
     "methods": {
       "email": "Email code",
@@ -285,7 +287,8 @@
     "view": {
       "cards": "Cards",
       "table": "Table"
-    }
+    },
+    "clearFilter": "Clear filter"
   },
   "peerNew": {
     "title": "Create New Peer",
@@ -295,7 +298,8 @@
     "steps": {
       "selectNode": "Select node",
       "configure": "Configure",
-      "review": "Review"
+      "review": "Review",
+      "done": "Done"
     },
     "selectNodeTitle": "Select a node",
     "configTitle": "Peer configuration",
@@ -327,7 +331,6 @@
     "pskEnabled": "Enabled (generated on creation)",
     "pskDisabled": "Disabled",
     "createdTitle": "Peer created",
-    "createdBody": "Your peer was submitted. Save the pre-shared key now — it won't be shown again.",
     "validation": {
       "pubkey": "Must be a base64 WireGuard key of at least 40 characters.",
       "endpoint": "Must be host:port or [IPv6]:port.",
@@ -341,7 +344,25 @@
     "noNodes": "No nodes available.",
     "pskAfterCreate": "shown after creation",
     "wgConfig": "WireGuard Config",
-    "yourPrivateKey": "your private key"
+    "yourPrivateKey": "your private key",
+    "ourInfoTitle": "Our Side Parameters",
+    "ourInfoBody": "Use these values to configure WireGuard and BGP on your side.",
+    "our": {
+      "asn": "Our ASN",
+      "endpoint": "Our Endpoint",
+      "pubkey": "Our Public Key",
+      "lla": "Our Link-Local"
+    },
+    "reviewYours": "You provided",
+    "reviewOurs": "Our side",
+    "doneTitle": "Peering request created",
+    "doneBodyPending": "Your request is awaiting review. After approval, deployment happens automatically — usually within minutes.",
+    "doneBodyActive": "Your peer was approved and is being deployed automatically. The tunnel should come up within minutes.",
+    "finalConfigTitle": "Your Configuration",
+    "finalConfigNote": "Paste this configuration on your side. These parameters remain available on the peer detail page.",
+    "pskIncluded": "The generated pre-shared key is included in the config above. You can also view it later on the peer detail page.",
+    "viewPeer": "View peer",
+    "backToList": "My peers"
   },
   "peerDetail": {
     "statusGuidance": "Status guidance",
@@ -362,10 +383,9 @@
       "lastHandshake": "Last Handshake"
     },
     "runtimeMetrics": "Runtime Metrics",
-    "traffic": "Traffic",
     "rx": "RX",
     "tx": "TX",
-    "rangeNote": "avg {rtt} ms · range {range}",
+    "rangeNote": "latest {rtt} ms · range {range}",
     "connParams": "Connection Parameters",
     "connParamsSub": "Remote details required to establish the tunnel.",
     "nodeConfig": "Node Configuration",
@@ -414,10 +434,11 @@
     "noBgpState": "not available",
     "noMetricsYet": "No metrics yet. Data will appear once the peer starts reporting.",
     "peakOut": "Peak out",
-    "rxRate": "RX rate (peak {rate})",
     "statusSummary": "Current peer state: {status}. BGP state: {bgp}.",
     "transferRate": "Transfer Rate",
-    "txRate": "TX rate"
+    "rxPeak": "RX · peak {rate}",
+    "txPeak": "TX · peak {rate}",
+    "transferred": "Transferred · {range}"
   },
   "lookingGlass": {
     "title": "Looking Glass",
@@ -446,7 +467,8 @@
     "noRoutes": "No routes found.",
     "offline": "offline",
     "packets": "Packets",
-    "rttMs": "RTT"
+    "rttMs": "RTT",
+    "nodeOffline": "The selected node is offline. Choose an online node and try again."
   },
   "security": {
     "title": "Security Sessions",
@@ -508,7 +530,8 @@
       "openLink": "Open in Telegram",
       "linkHint": "Open this link in Telegram within 10 minutes to finish linking.",
       "prefsTitle": "Telegram notifications",
-      "waiting": "Waiting for you to finish linking in Telegram…"
+      "waiting": "Waiting for you to finish linking in Telegram…",
+      "linkTimeout": "Linking timed out. Press Link again to retry."
     },
     "labels": {
       "critical": "Critical",
@@ -533,7 +556,8 @@
     "collapse": "Collapse",
     "expand": "Expand",
     "target": "Target",
-    "totalCount": "{count} entries"
+    "totalCount": "{count} entries",
+    "emptyFiltered": "No audit entries match this filter."
   },
   "mcpKeys": {
     "title": "MCP API Keys",
@@ -610,7 +634,9 @@
     "page404Body": "The page you are looking for does not exist or has moved.",
     "page500Title": "Something went wrong",
     "page500Body": "An unexpected error occurred. Please try again.",
-    "backHome": "Back to home"
+    "backHome": "Back to home",
+    "pageUnavailableTitle": "Service unavailable",
+    "pageUnavailableBody": "The server is temporarily unreachable — it may be restarting or under maintenance. Please try again in a moment."
   },
   "admin": {
     "overview": {
@@ -695,7 +721,7 @@
       "importOverwrite": "Overwrite existing peers (otherwise they are skipped)",
       "importResult": "Imported {imported}, overwritten {overwritten}, skipped {skipped} of {total} peers.",
       "importTitle": "Import peers",
-      "searchPlaceholder": "Search ASN, node, or endpoint"
+      "searchPlaceholder": "Filter this page by ASN, node, or endpoint"
     },
     "nodes": {
       "title": "Node Management",
@@ -798,7 +824,9 @@
       "uploading": "Uploading…",
       "uploadFailed": "Upload failed",
       "duplicate": "This version already exists for this OS/arch. Delete it first before re-uploading.",
-      "tooLarge": "Binary file exceeds the 100 MB limit."
+      "tooLarge": "Binary file exceeds the 100 MB limit.",
+      "versionPlaceholder": "v1.2.3",
+      "processing": "Processing on server…"
     },
     "bot": {
       "title": "Telegram Bot",
@@ -828,7 +856,9 @@
       "blocked": "User blocked",
       "unblocked": "User unblocked",
       "noCommands": "No commands recorded.",
-      "noBlocked": "No blocked users."
+      "noBlocked": "No blocked users.",
+      "resetTokenTitle": "Reset bot token?",
+      "resetTokenWarning": "The current token becomes invalid immediately. The bot stays disconnected until the new token is configured."
     },
     "settings": {
       "title": "Site Settings",
@@ -860,7 +890,8 @@
       "clearFilters": "Clear",
       "expand": "Show detail",
       "collapse": "Hide detail",
-      "entries": "{count} entries"
+      "entries": "{count} entries",
+      "emptyFiltered": "No audit entries match these filters."
     },
     "devices": {
       "title": "Admin Sessions",
@@ -1071,7 +1102,7 @@
       "enqueuedAt": "Enqueued at",
       "noEvents": "No enqueue events.",
       "page": "Page {page}",
-      "pageOf": "Page {page} of {pages}",
+      "pageOf": "Page {page} of {pages} · {count} tasks",
       "deleteTaskTitle": "Delete task?",
       "confirmDeleteTask": "This task will be permanently removed from the queue. This cannot be undone.",
       "cancelTitle": "Cancel active task?",
@@ -1164,12 +1195,9 @@
     "noMetrics": "No metrics recorded yet for this range.",
     "chartRtt": "RTT",
     "rttCurrent": "latest {rtt} ms · range {range}",
-    "chartTraffic": "Traffic",
     "rx": "RX",
     "tx": "TX",
     "chartRate": "Transfer rate",
-    "rxRate": "RX rate · peak {rate}/s",
-    "txRate": "TX rate",
     "chartRoutes": "Routes",
     "imported": "Imported",
     "exported": "Exported",
@@ -1184,7 +1212,10 @@
     "contactRetry": "Retry verification",
     "contactSaved": "Contact email updated",
     "deleteConfirmLabel": "Type \"delete\" to confirm",
-    "deleteConfirmPlaceholder": "delete"
+    "deleteConfirmPlaceholder": "delete",
+    "rxPeak": "RX · peak {rate}",
+    "txPeak": "TX · peak {rate}",
+    "transferred": "Transferred · {range}"
   },
   "assistant": {
     "clear": "Clear",
@@ -1206,7 +1237,6 @@
   "userAudit": {
     "accountRelated": "Account-level event",
     "actionPlaceholder": "e.g. peer.approve",
-    "actionUnknown": "Audit event",
     "asnRelated": "Related ASN: AS{asn}",
     "peerRelated": "Peer-related event"
   }

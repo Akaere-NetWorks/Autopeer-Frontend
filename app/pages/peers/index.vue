@@ -5,7 +5,6 @@ definePageMeta({ middleware: 'auth', title: 'nav.myPeers' })
 
 const { t } = useI18n()
 const api = useApi()
-const toast = useToast()
 const { meta } = usePeerStatus()
 const { fmtRtt } = useFormat()
 
@@ -24,12 +23,6 @@ const { data, pending, error, refresh } = await useAsyncData('peers', async () =
     creationEnabled: creation.enabled,
   }
 }, { lazy: true, server: false })
-
-// Surface load failures via toast, and re-surface on every subsequent refetch
-// failure (not just the first), without ever conflating error with "empty".
-watch(error, (e) => {
-  if (e) toast.error(e)
-}, { immediate: true })
 
 const peers = computed(() => data.value?.peers ?? [])
 const creationEnabled = computed(() => data.value?.creationEnabled ?? true)
@@ -108,9 +101,9 @@ const viewOptions = [
       <MdButton v-if="creationEnabled" variant="filled" icon="add" @click="navigateTo('/peers/new')">{{ t('peers.newPeer') }}</MdButton>
     </div>
 
-    <div v-else-if="!filtered.length" class="card card-outlined card-pad text-center txt-variant">
-      {{ t('peers.emptyFiltered') }}
-    </div>
+    <EmptyState v-else-if="!filtered.length" icon="filter_alt_off" :body="t('peers.emptyFiltered')">
+      <MdButton variant="tonal" icon="filter_alt_off" @click="filter = 'all'">{{ t('peers.clearFilter') }}</MdButton>
+    </EmptyState>
 
     <!-- Table view -->
     <div v-else-if="view === 'table'" class="card card-elevated">

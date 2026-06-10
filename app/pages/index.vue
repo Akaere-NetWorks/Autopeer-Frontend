@@ -189,12 +189,11 @@ useHead({ title: t('landing.title') })
         <h2 class="md-title-large" :style="{ margin: 0 }">{{ t('landing.nodesTitle') }}</h2>
         <p class="md-body-medium txt-variant" :style="{ margin: '4px 0 0' }">{{ t('landing.nodesSubtitle') }}</p>
       </div>
-      <!-- Error: distinct from the empty state so a failed fetch never masquerades as an empty network -->
+      <!-- Error: distinct from the empty state so a failed fetch never masquerades
+           as an empty network. Retry lives in the page-level banner above; a second
+           button here would be redundant. -->
       <div v-if="showError" class="col gap-3" :style="{ padding: '8px 24px 24px', alignItems: 'flex-start' }">
         <p class="md-body-medium" :style="{ margin: 0, color: 'var(--md-sys-color-error)' }">{{ t('landing.nodesError') }}</p>
-        <button v-ripple class="btn btn-tonal" @click="reload">
-          <MdSym name="refresh" /> <span>{{ t('common.retry') }}</span>
-        </button>
       </div>
       <div v-else-if="data === null || retrying" :style="{ padding: '16px 24px 24px' }" class="col gap-3">
         <SkeletonBlock v-for="i in 4" :key="i" height="40px" />
